@@ -25,7 +25,7 @@ import AddInformation from "./pages/superAdmin/AddInformation";
 import SuperAdminSettings from "./pages/superAdmin/Settings";
 
 
-
+//sangita
 
 import ZonalAdminIndex from "./pages/zonalAdmin";
 
