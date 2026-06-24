@@ -1,0 +1,16 @@
+.IndexHeader{position: absolute; left: 50px; top: 50px;}
+.FormContainer {width: 100%; height: 100vh; background: #D0E3D6; display: flex; justify-content: center; align-items: center; }
+.FormContainer .login-box {width: 500px; background: #ffffff; padding: 55px 60px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);} 
+.FormContainer .login-box h1{text-align: center;}
+.FormContainer .ForgetPassword{text-align: right;}
+.FormContainer .otp-wrapper input{width: 18%; height: 40px; margin: 1%; text-align: center;}
+.otp-resend-row{text-align: center; margin: 8px 0 12px;}
+.otp-timer{font-size: 14px; margin: 0; color: #555;}
+.otp-resend-link{background: transparent; border: none; color: var(--SecondayColor); cursor: pointer; font-size: 14px; font-weight: 600; padding: 0;}
+.otp-resend-link:disabled{cursor: not-allowed; opacity: 0.7;}
+.error-text{color: red; font-size: 14px; margin-top: 5px;}
+
+
+
+
+
