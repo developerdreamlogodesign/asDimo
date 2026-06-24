@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import "./UIstyles.css";
+import "./temp.css";
 import UploadCameraIcon from "../../assets/Images/UploadCameraIcon.svg";
 import DashboardButtons from "./Buttons";
 import { RefreshCcwIcon } from "lucide-animated";

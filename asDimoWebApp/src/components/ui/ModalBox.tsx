@@ -1,5 +1,5 @@
 import React from "react";
-import "./UIstyles.css";
+import "./temp.css";
 
 interface ConfirmModalProps {
   header?: React.ReactNode;

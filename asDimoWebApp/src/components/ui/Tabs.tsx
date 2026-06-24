@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import "./UIstyles.css";
+import "./temp.css";
 
 interface Tab {
   label: string;

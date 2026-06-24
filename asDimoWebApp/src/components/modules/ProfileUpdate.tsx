@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import ProfileField from "../ui/ProfileField";
 import { ProfileImageField } from "../ui/ProfileField";
 import ModalBox from "../ui/ModalBox";
-import "../ui/UIstyles.css";
+import "../ui/temp.css";
 import { filebasename } from "../../api/config";
 import { authService } from "../../services/authService";
 
