@@ -39,26 +39,23 @@ jobs:
 
       - run: npm ci
 
-deploy:
-  needs: [frontend, backend]
-  runs-on: ubuntu-latest
+  deploy:
+    needs: [frontend, backend]
+    runs-on: ubuntu-latest
 
-  steps:
-    - name: Deploy Backend
-      uses: appleboy/ssh-action@v1.2.0
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USER }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
-        script: |
-          cd ~/public_html/dev/asDimo
+    steps:
+      - name: Deploy Backend
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd ~/public_html/dev/asDimo
 
-          git pull origin main
+            git pull origin main
 
-          cd asDimoBackend
+            cd asDimoBackend
+            npm install
 
-          npm ci || npm install
-
-          npx pm2 restart asdimo-api || npx pm2 start server.js --name asdimo-api
-
-          npx pm2 list
+            npx pm2 restart asdimo-api || npx pm2 start server.js --name asdimo-api
