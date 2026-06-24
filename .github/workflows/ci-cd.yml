@@ -60,3 +60,17 @@ jobs:
             npm install
 
             npx pm2 restart asdimo-api || npx pm2 start server.js --name asdimo-api
+
+            script: |
+              cd ~/public_html/dev/asDimo
+
+              git pull origin main
+
+              cd asDimoWebApp
+              npm ci || npm install
+              npm run build
+
+              cd ../asDimoBackend
+              npm ci || npm install
+
+              npx pm2 restart asdimo-api || npx pm2 start server.js --name asdimo-api
