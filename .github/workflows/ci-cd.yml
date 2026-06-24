@@ -39,38 +39,74 @@ jobs:
 
       - run: npm ci
 
+  # deploy:
+  #   needs: [frontend, backend]
+  #   runs-on: ubuntu-latest
+
+  #   steps:
+  #     - name: Deploy Backend
+  #       uses: appleboy/ssh-action@v1.2.0
+  #       with:
+  #         host: ${{ secrets.SERVER_HOST }}
+  #         username: ${{ secrets.SERVER_USER }}
+  #         key: ${{ secrets.SERVER_SSH_KEY }}
+  #         passphrase: ${{ secrets.SERVER_PASSPHRASE }}
+  #         script: |
+  #           cd ~/public_html/dev/asDimo
+
+  #           git pull origin main
+
+  #           cd asDimoBackend
+  #           npm install
+
+  #           npx pm2 restart asdimo-api || npx pm2 start server.js --name asdimo-api
+
+  #           script: |
+  #             cd ~/public_html/dev/asDimo
+
+  #             git pull origin main
+
+  #             cd asDimoWebApp
+  #             npm ci || npm install
+  #             npm run build
+
+  #             cd ../asDimoBackend
+  #             npm ci || npm install
+
+  #             npx pm2 restart asdimo-api || npx pm2 start server.js --name asdimo-api
+
   deploy:
-    needs: [frontend, backend]
-    runs-on: ubuntu-latest
+  needs: [frontend, backend]
+  runs-on: ubuntu-latest
 
-    steps:
-      - name: Deploy Backend
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          passphrase: ${{ secrets.SERVER_PASSPHRASE }}
-          script: |
-            cd ~/public_html/dev/asDimo
+  steps:
+    - name: Deploy
+      uses: appleboy/ssh-action@v1.2.0
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        passphrase: ${{ secrets.SERVER_PASSPHRASE }}
+        script: |
+          cd ~/public_html/dev/asDimo
 
-            git pull origin main
+          echo "=== CURRENT BRANCH ==="
+          git branch
 
-            cd asDimoBackend
-            npm install
+          echo "=== PULLING ==="
+          git pull origin main
 
-            npx pm2 restart asdimo-api || npx pm2 start server.js --name asdimo-api
+          echo "=== LATEST COMMIT ==="
+          git log --oneline -1
 
-            script: |
-              cd ~/public_html/dev/asDimo
+          cd asDimoWebApp
+          npm ci
+          npm run build
 
-              git pull origin main
+          cd ../asDimoBackend
+          npm ci
 
-              cd asDimoWebApp
-              npm ci || npm install
-              npm run build
+          npx pm2 restart asdimo-api || npx pm2 start server.js --name asdimo-api
 
-              cd ../asDimoBackend
-              npm ci || npm install
-
-              npx pm2 restart asdimo-api || npx pm2 start server.js --name asdimo-api
+          echo "=== PM2 STATUS ==="
+          npx pm2 list
