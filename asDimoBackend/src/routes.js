@@ -37,7 +37,7 @@ authRouter.post(
   uploadProfile.single("profileImg"),
   authController.register
 );
-// authRouter.post("/login", authController.login);
+authRouter.post("/login", authController.login);
 authRouter.post("/refresh-token", authController.refreshToken);
 authRouter.post("/logout", authenticate, protect, authController.logout);
 authRouter.post("/forgot-password", authController.forgotPassword);
