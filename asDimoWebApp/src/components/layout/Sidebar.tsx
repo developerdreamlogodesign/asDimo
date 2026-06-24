@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import "./layout.css";
-import "../../components/ui/UIstyles.css";
+import "../../components/ui/temp.css";
 import { NavLink } from "react-router-dom";
 
 import { routes } from "../../routes/AppRoutes";

@@ -1,5 +1,5 @@
 import React from "react";
-import "./UIstyles.css";
+import "./temp.css";
 // import PlaceholderImage from "../../assets/Images/PlaceholderImage.svg";
 
 interface TableField {
