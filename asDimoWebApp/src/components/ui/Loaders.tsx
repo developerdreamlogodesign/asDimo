@@ -1,5 +1,5 @@
 import React from "react";
-import "./UIStyles.css";
+import "./UIstyles.css";
 interface LoaderProps { text?: string; fullScreen?: boolean; }
 
 const Loader: React.FC<LoaderProps> = ({
