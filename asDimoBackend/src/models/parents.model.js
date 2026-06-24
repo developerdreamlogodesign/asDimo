@@ -1,0 +1,60 @@
+import mongoose from "mongoose";
+
+const parentsSchema = new mongoose.Schema(
+  {
+    parentId: {
+      type: Number,
+      required: true,
+      unique: true,
+      index: true,
+    },
+    userId: {
+      type: Number,
+      required: true,
+      unique: true,
+      index: true,
+    },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    organizationId: {
+      type: Number,
+      default: null,
+      index: true,
+    },
+    organizationAdminId: {
+      type: Number,
+      default: null,
+      index: true,
+    },
+    zonalAdminId: {
+      type: Number,
+      default: null,
+      index: true,
+    },
+    adminId: {
+      type: Number,
+      default: null,
+      index: true,
+    },
+    therapistId: {
+      type: Number,
+      default: null,
+      index: true,
+    },
+    teacherId: {
+      type: Number,
+      default: null,
+      index: true,
+    },
+
+    // TODO: add more parent-specific fields here (phone, child details, etc.)
+  },
+  { timestamps: true }
+);
+
+export default mongoose.model("Parent", parentsSchema);
+

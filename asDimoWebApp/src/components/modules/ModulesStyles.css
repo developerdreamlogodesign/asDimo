@@ -1,0 +1,38 @@
+/* ViewProfileDetails Start */
+.ViewProfileDetails:not(.ORG) .Profile_Editable{width: 60%; margin-top: 50px;}
+.TotalCount{align-items: center; padding: 10px 0px;}
+.TotalCount:not(:last-child){border-bottom: solid 2px var(--GreyBorders);}
+.TotalCount .Heading2{width: 80%;}
+.TotalCount .Heading3{width: 20%; text-align: right;}
+.ViewProfileDetails:not(.ORG) .ORGList{margin-top: 50px; margin-left: 30px; width: 40%;}
+.ORGList .GlobalButton .greyborder{padding-left: 15px;}
+.OrganisationList{align-items: center; margin-bottom: 20px;}
+.ORGList .GlobalButton{width: 30%; display: flex; justify-content: end;}
+.ORGList .Heading2{width: 70%;}
+/* ViewProfileDetails End */
+
+/* FormAdd Start */
+.AddInformation{margin-top: 30px;}
+/* FormAdd Start */
+
+/* Global Table List Start */
+.TableSearchWrap{align-items: center;}
+.TableSearchWrap .search-sort-container{width: 50%;}
+.TableSearchWrap .AddUpdateButton {width: 50%; display: flex; justify-content: end; margin-top: -125px; gap: 20px;}
+/* Global Table List End */
+
+/* View Details Start */
+.GlobalModalBox .profile-field{padding: 10px 0;}
+.GlobalModalBox .profile-field .GlobalButton button{background: var(--GreenButtonHover); padding: 7px 15px 5px 0px; border: solid 1px var(--GreenButtonHover);}
+/* View Details End */
+
+/* AddInformation Start*/
+.AddInfoWordWrap{width: 70%;}
+.BacktoListButton {display: flex; justify-content: end; width: 30%; align-items: center;}
+/* AddInformation End*/
+
+
+
+
+
+
