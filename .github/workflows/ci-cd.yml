@@ -62,7 +62,8 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           passphrase: ${{ secrets.SERVER_PASSPHRASE }}
           source: "dist/*"
-          target: "~/public_html/dev/asDimo/asDimoWebApp/"
+          target: "~/frontend-build/"
+          strip_components: 1
 
       - name: Deploy backend
         uses: appleboy/ssh-action@v1.2.0
