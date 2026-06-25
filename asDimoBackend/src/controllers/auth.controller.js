@@ -146,28 +146,28 @@ export const register = asyncHandler(async (req, res) => {
 });
 
 
-// export const login = asyncHandler(async (req, res) => {
-//   const { email, password } = req.body;
-//   if (!email || !password) {
-//     return res.status(400).json({
-//       success: false,
-//       message: "Please provide email and password",
-//     });
-//   }
+export const login = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({
+      success: false,
+      message: "Please provide email and password",
+    });
+  }
 
-//   const { user, token, accessToken, refreshToken } = await loginUser(email, password);
+  const { user, token, accessToken, refreshToken } = await loginUser(email, password);
 
-//   res.status(200).json({
-//     success: true,
-//     message: "Login successful",
-//     data: {
-//       user,
-//       token,
-//       accessToken,
-//       refreshToken,
-//     },
-//   });
-// });
+  res.status(200).json({
+    success: true,
+    message: "Login successful",
+    data: {
+      user,
+      token,
+      accessToken,
+      refreshToken,
+    },
+  });
+});
 
 export const refreshToken = asyncHandler(async (req, res) => {
   const { refreshToken: tokenFromBody } = req.body;
