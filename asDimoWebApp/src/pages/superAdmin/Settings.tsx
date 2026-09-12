@@ -5,6 +5,7 @@ import ProfileUpdate from "../../components/modules/ProfileUpdate";
 import Loader from "../../components/ui/Loaders";
 import { authService } from "../../services/authService";
 import { getCurrentUserRole } from "../../middleware/AuthMiddleware";
+import AppointmentDetails from "../therapist/AppointmentSettings";
 
 
 const CustomerDocuments: React.FC = () => {
@@ -37,10 +38,12 @@ const CustomerDocuments: React.FC = () => {
 
 
 const tabsData: {
-  label: string;
+  id: string;
+  label: React.ReactNode;
   content: React.ReactNode;
 }[] = [
   {
+    id: "general",
     label: "General",
     content: loading ? (
       <Loader />
@@ -52,9 +55,18 @@ const tabsData: {
 
 if (role === "SuperAdmin") {
   tabsData.push({
+    id: "billing-plans",
     label: "Edit Billing Plans",
     content: <div>Edit Billing Plans Content</div>,
-  });
+});  
+};
+
+if (role === "TeachersOrg" || role === "teachersGlobal") {
+  tabsData.push({
+    id: "time-slot",
+    label: "Select Time Slot",
+    content: <AppointmentDetails/>,
+});  
 };
 
   return (

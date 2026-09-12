@@ -20,19 +20,25 @@ import SupTherapist from "./pages/superAdmin/therapistAdmin";
 import SupParent from "./pages/superAdmin/parentAdmin";
 import SupAdmin from "./pages/superAdmin/Admin";
 import SupAppointment from "./pages/superAdmin/appoinmentList";
+import Report from "./pages/superAdmin/Report";
 import SupTherapistDetails from "./pages/superAdmin/TherapistDetails";
+import SupAppointmentDetails from "./pages/superAdmin/AppointmentDetails";
+import SupUserDetails  from "./pages/superAdmin/UserDetails";
 import AddInformation from "./pages/superAdmin/AddInformation";
 import SuperAdminSettings from "./pages/superAdmin/Settings";
+import PaymentPage from "./pages/superAdmin/PaymentPage";
 
 
-//sangita ff
+
 
 import ZonalAdminIndex from "./pages/zonalAdmin";
 
 import OrganizationAdminIndex from "./pages/organization";
 
 
-import AdminIndex from "./pages/Admins/Index"
+import AdminIndex from "./pages/Admins/Index";
+
+import TherapistIndex from "./pages/therapist/Index";
 
 
 
@@ -44,6 +50,12 @@ function App() {
       <Routes>
         {/* Login */}
         <Route path={routes.LOGIN} element={<AuthMain />} />
+
+        {/* ================= GLOBAL PAYMENT ================= */}
+        <Route
+          path={routes.PAYMENT}
+          element={<PaymentPage />}
+        />
 
         {/* ================= SUPER ADMIN ================= */}
 
@@ -62,9 +74,13 @@ function App() {
           <Route path="organization-details" element={<SupORGadminDetails />} />
           <Route path="therapist" element={<SupTherapist />} />
           <Route path="therapist-details" element={<SupTherapistDetails />} />
+          <Route path="user-details" element={<SupUserDetails />} />
+          <Route path="appointment-details/:appointmentId" element={<SupAppointmentDetails />} />
           <Route path="parent" element={<SupParent />} />
           <Route path="appointment" element={<SupAppointment />} />
+          <Route path="appointment-details/:appointmentId" element={<SupAppointmentDetails />} />
           <Route path="add-information" element={<AddInformation />} />
+          <Route path="report" element={<Report />} />
           <Route path="settings" element={<SuperAdminSettings />} />
         </Route>
 
@@ -80,23 +96,19 @@ function App() {
         >
 
           <Route index element={<ZonalAdminIndex />} />
+          <Route path="admin" element={<SupAdmin />} />
+          <Route path="admin-details" element={<AdminDetails />} />
+          <Route path="organization" element={<SupOrganization />} />
+          <Route path="organization-details" element={<SupORGadminDetails />} />
+          <Route path="therapist" element={<SupTherapist />} />
+          <Route path="therapist-details" element={<SupTherapistDetails />} />
+          <Route path="parent" element={<SupParent />} />
+          <Route path="report" element={<Report />} />
+          <Route path="appointment" element={<SupAppointment />} />
+          <Route path="appointment-details/:appointmentId" element={<SupAppointmentDetails />} />
+          <Route path="add-information" element={<AddInformation />} />
           <Route path="settings" element={<SuperAdminSettings />} />
         </Route>
-
-
-
-        {/* ================= ORGANIZATION ADMIN ================= */}
-
-        <Route path={routes.ORGANIZATIONADMIN} element={
-            <AuthMiddleware allowedFlags={["OrganizationAdmin"]}>
-              <DashboardLayOut />
-            </AuthMiddleware>
-          }
-        >
-          <Route index element={<OrganizationAdminIndex />} />
-          <Route path="settings" element={<SuperAdminSettings />} />
-        </Route>
-
 
 
         {/* ================= ADMIN ================= */}
@@ -108,9 +120,56 @@ function App() {
           }
         >
           <Route index element={<AdminIndex />} />
+          <Route path="organization" element={<SupOrganization />} />
+          <Route path="organization-details" element={<SupORGadminDetails />} />
+          <Route path="therapist" element={<SupTherapist />} />
+          <Route path="therapist-details" element={<SupTherapistDetails />} />
+          <Route path="parent" element={<SupParent />} />
+          <Route path="report" element={<Report />} />
+          <Route path="appointment" element={<SupAppointment />} />
+          <Route path="appointment-details/:appointmentId" element={<SupAppointmentDetails />} />
+          <Route path="add-information" element={<AddInformation />} />
           <Route path="settings" element={<SuperAdminSettings />} />
         </Route>
 
+
+        {/* ================= ORGANIZATION ADMIN ================= */}
+
+        <Route path={routes.ORGANIZATIONADMIN} element={
+            <AuthMiddleware allowedFlags={["OrganizationAdmin", "teachersGlobal"]}>
+              <DashboardLayOut />
+            </AuthMiddleware>
+          }
+        >
+          <Route index element={<OrganizationAdminIndex />} />
+          <Route path="therapist" element={<SupTherapist />} />
+          <Route path="therapist-details" element={<SupTherapistDetails />} />
+          <Route path="parent" element={<SupParent />} />
+          <Route path="report" element={<Report />} />
+          <Route path="appointment" element={<SupAppointment />} />
+          <Route path="appointment-details/:appointmentId" element={<SupAppointmentDetails />} />
+          <Route path="add-information" element={<AddInformation />} />
+          <Route path="settings" element={<SuperAdminSettings />} />
+        </Route>
+
+
+
+        {/* ================= THERAPIST ================= */}
+
+        <Route path={routes.THERAPIST} element={
+            <AuthMiddleware allowedFlags={["TeachersOrg","teachersGlobal"]}>
+              <DashboardLayOut />
+            </AuthMiddleware>
+          }
+        >
+          <Route index element={<TherapistIndex />} />
+          <Route path="parent" element={<SupParent />} />
+          <Route path="report" element={<Report />} />
+          <Route path="appointment" element={<SupAppointment />} />
+          <Route path="appointment-details/:appointmentId" element={<SupAppointmentDetails />} />
+          <Route path="add-information" element={<AddInformation />} />
+          <Route path="settings" element={<SuperAdminSettings />} />
+        </Route>
 
 
       </Routes>

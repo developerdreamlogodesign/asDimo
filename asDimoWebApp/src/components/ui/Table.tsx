@@ -1,16 +1,17 @@
 import React, { useMemo, useState, useEffect, } from "react";
-import {DeleteIcon, ChevronLeftIcon, ChevronRightIcon, ArrowDownIcon } from 'lucide-animated';
-import ExportIcon from "../../assets/Images/ExportIcon.svg";
+import {DeleteIcon, ChevronLeftIcon, ChevronRightIcon, ArrowDownIcon, DownloadIcon, ChartColumnDecreasingIcon} from 'lucide-animated';
 import DashboardButtons from "./Buttons";
+import { tokenManager } from "../../services/tokenManager";
 
 interface TableColumn {
   key: string;
   title: string;
   width?: string;
-  render?: ( value: any, row: any, rowIndex: number ) => React.ReactNode; 
+  fixed?: boolean;
+  render?: (value: any, row: any, rowIndex: number) => React.ReactNode;
   showFilter?: boolean;
   onFilterClick?: (key: string) => void;
-} 
+}
 
 
 interface TableProps {
@@ -22,7 +23,7 @@ interface TableProps {
   rowsPerPageOptions?: number[];
   onBulkDelete?: boolean;
   onDeleteSelected?: ( selectedRows: any[] ) => void;
-onSelectionChange?: ( selectedRows: any[] ) => void;
+  onSelectionChange?: ( selectedRows: any[] ) => void;
   currentPage?: number;
   totalPages?: number;
   rowsPerPage?: number;
@@ -30,6 +31,8 @@ onSelectionChange?: ( selectedRows: any[] ) => void;
   onRowsPerPageChange?: ( value: number ) => void;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
+  displayLimit?: number;
+  showChooseColumns?: boolean;
 }
 
 const Table: React.FC<TableProps> = ({
@@ -49,7 +52,20 @@ const Table: React.FC<TableProps> = ({
   onRowsPerPageChange,
   sortBy,
   sortOrder = "asc",
+  displayLimit,
+  showChooseColumns = false,
 }) => {
+  const roleFlag = Number(tokenManager.getUser()?.flag);
+  const hiddenColumnKeysByRole: Record<number, string[]> = {
+    6: ["zonalAdmin", "zonal_admin_name"],
+    7: ["admin", "admin_name"],
+    1: ["organization", "organization_name"],
+    3: ["teacher", "doctor", "therapist"],
+  };
+  const permittedColumns = useMemo(
+    () => columns.filter((column) => !hiddenColumnKeysByRole[roleFlag]?.includes(column.key)),
+    [columns, roleFlag]
+  );
   const [selectedRows, setSelectedRows] = useState<number[]>([]);
     useEffect(() => {
     onSelectionChange?.(
@@ -167,41 +183,132 @@ const handleExportSelected = () => {
   URL.revokeObjectURL(url);
 };
 
+const limitedRows = displayLimit
+  ? paginatedRows.slice(0, displayLimit)
+  : paginatedRows;
+
+const STORAGE_KEY = "table-columns";
+const [showColumnPicker, setShowColumnPicker] = useState(false);
+const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
+useEffect(() => {
+  if (!showChooseColumns) {
+    setVisibleColumns(permittedColumns.map((c) => c.key));
+    return;
+  }
+
+  const saved = localStorage.getItem(STORAGE_KEY);
+
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      const validColumns = Array.isArray(parsed)
+        ? parsed.filter((key) => permittedColumns.some((c) => c.key === key))
+        : [];
+
+      setVisibleColumns(
+        validColumns.length > 0
+          ? validColumns
+          : permittedColumns.map((c) => c.key)
+      );
+    } catch {
+      setVisibleColumns(permittedColumns.map((c) => c.key));
+    }
+  } else {
+    setVisibleColumns(permittedColumns.map((c) => c.key));
+  }
+}, [permittedColumns, showChooseColumns]);
+useEffect(() => {
+  if (showChooseColumns && visibleColumns.length) {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(visibleColumns)
+    );
+  }
+}, [visibleColumns, showChooseColumns]);
+
+
+const toggleColumn = (key: string) => {
+  const column = permittedColumns.find(c => c.key === key);
+
+  if (!column) return;
+
+  if (column.fixed) return;
+
+  if (visibleColumns.includes(key)) {
+    setVisibleColumns(prev =>
+      prev.filter(k => k !== key)
+    );
+    return;
+  }
+
+  const optionalSelected =
+    visibleColumns.filter(k => {
+      const col = permittedColumns.find(c => c.key === k);
+      return col && !col.fixed;
+    }).length;
+
+  if (optionalSelected >= 5) {
+    alert("Maximum 5 optional columns allowed.");
+    return;
+  }
+
+  setVisibleColumns(prev => [...prev, key]);
+};
+
+const displayedColumns = permittedColumns.filter(
+  c => c.fixed || visibleColumns.includes(c.key)
+);
+
+
   return (
     <div className={`custom-table-wrapper ${className}`}>
       {/* Top Actions */}
-      {selectable && selectedRows.length > 0 && (
-        <div className="table-top-actions">
+      <div className="d-flex table-top-actions">
+          {selectable && selectedRows.length > 0 && (
+            <div className="ActionButtonsInvisible">
 
-          {/* <button className="export-btn" onClick={handleExportSelected} > Export ({selectedRows.length}) </button> */}
-          <DashboardButtons text="Export" variant="blueborder" textsize="sm" icon={<img src={ExportIcon} alt="Add" className="btn-icon" />} onClick={handleExportSelected}/> 
-          {onBulkDelete && (
-          <button
-            className="bulk-delete-btn"
-            onClick={handleBulkDelete}
-            title={`Delete ${selectedRows.length} selected items`}
-          >
-            <DeleteIcon size={20} />
-            <span className="delete-badge">
-              {selectedRows.length}
-            </span>
-          </button>
+              {onBulkDelete && (
+              <button
+                className="bulk-delete-btn"
+                onClick={handleBulkDelete}  
+                title={`Delete ${selectedRows.length} selected items`}
+              >
+                <DeleteIcon size={20} />
+                <span className="delete-badge">
+                  {selectedRows.length}
+                </span>
+              </button>
+              )}
+              <DashboardButtons text="Export" variant="blueborder" textsize="sm" icon={<DownloadIcon size={18} className="icon"/>} onClick={handleExportSelected}/> 
+            </div>
           )}
-        </div>
-      )}
-      {/* {selectable && onBulkDelete && selectedRows.length > 0 && (
-        // <div className="table-top-actions">
-        //   <Buttons
-        //   textsize="md"
-        //   text={`(${selectedRows.length})`}
-        //   variant="red"
-        //   icon={<DeleteIcon size={25}/>}
-        //   onClick={handleBulkDelete}
-        // />
-        // </div>
-        <div className="table-top-actions">
-        </div> 
-      )} */}
+          {showChooseColumns && (
+          <div className="table-toolbar">
+            <DashboardButtons text="Columns" variant="blueborder" textsize="sm"  icon={<ChartColumnDecreasingIcon size={18} className="icon"/>} onClick={() => setShowColumnPicker(!showColumnPicker) }/>
+              {showColumnPicker && (
+                  <div className="column-picker">
+                      {permittedColumns.map(col => (
+                          <label key={col.key}>
+                              <input
+                                  type="checkbox"
+                                  checked={
+                                      col.fixed ||
+                                      visibleColumns.includes(col.key)
+                                  }
+                                  disabled={col.fixed}
+                                  onChange={() =>
+                                      toggleColumn(col.key)
+                                  }
+                              />
+                              {col.title}
+                          </label>
+                      ))}
+                  </div>
+              )}
+          </div>
+        )}
+    </div>
+
       {selectable && (
         <div className="mobile-select-all">
           <label>
@@ -219,7 +326,7 @@ const handleExportSelected = () => {
         <thead>
           <tr>
             {selectable && (
-              <th>
+              <th className="custom-checkbox">
               <div className="d-flex check-button"> 
               <input
                 type="checkbox"
@@ -231,7 +338,7 @@ const handleExportSelected = () => {
               </th>
             )}
 
-            {columns.map((col) => (
+            {displayedColumns.map((col) => (
               <th
                 key={col.key}
                 style={{ width: col.width || "auto" }}
@@ -277,62 +384,58 @@ const handleExportSelected = () => {
           </tr>
         </thead>
 
-        <tbody>
-          {paginatedRows.length > 0 ? (
-            paginatedRows.map((row, rowIndex) => {
-              const actualIndex =
-                (currentPage - 1) * rowsPerPage + rowIndex;
+          <tbody>
+            {paginatedRows.length > 0 ? (
+              limitedRows.map((row, rowIndex) => {
+                const actualIndex =
+                  (currentPage - 1) * rowsPerPage + rowIndex;
 
-              return (
-                <tr key={actualIndex}>
-                  {selectable && (
-                    <td>
-                    <div className="d-flex check-button"> 
-                      <input
-                        type="checkbox"
-                        className="custom-checkbox"
-                        checked={selectedRows.includes(
-                          actualIndex
-                        )}
-                        onChange={() =>
-                          handleRowSelect(actualIndex)
-                        }
-                      />
-                      </div>
-                    </td>
-                  )}
+                return (
+                  <tr key={actualIndex}>
+                    {selectable && (
+                      <td className="custom-checkbox">
+                        <div className="d-flex check-button">
+                          <input
+                            type="checkbox"
+                            className="custom-checkbox"
+                            checked={selectedRows.includes(actualIndex)}
+                            onChange={() => handleRowSelect(actualIndex)}
+                          />
+                        </div>
+                      </td>
+                    )}
 
-                {columns.map((col) => (
-                  <td
-                    key={col.key}
-                    data-label={col.title}
-                  >
-                    {col.render
-                      ? col.render(
-                          row[col.key],
-                          row,
-                          actualIndex
-                        )
-                      : row[col.key]}
-                  </td>
-                ))}
-                </tr>
-              );
-            })
-          ) : (
-            <tr>
-              <td
-                colSpan={
-                  selectable
-                    ? columns.length + 1
-                    : columns.length
-                }
-              >
-                No Data Found
-              </td>
-            </tr>
-          )}
-        </tbody>
+                    {displayedColumns.map((col) => (
+                      <td
+                        key={col.key}
+                        data-label={col.title}
+                      >
+                        {col.render
+                          ? col.render(
+                              row[col.key],
+                              row,
+                              actualIndex
+                            )
+                          : row[col.key]}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })
+            ) : (
+              <tr>
+                <td
+                  colSpan={
+                    selectable
+                      ? displayedColumns.length + 1
+                      : displayedColumns.length
+                  }
+                >
+                  No Data Found
+                </td>
+              </tr>
+            )}
+          </tbody>
       </table>
       </div>
 

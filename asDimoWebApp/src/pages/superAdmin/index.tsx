@@ -1,2 +1,14 @@
-const SuperAdminIndex = () => <h1>Super Admin Page</h1>;
-export default SuperAdminIndex;
+import React from "react";
+import Analytices from "../../components/modules/Analytices";
+
+const MainDashboard: React.FC= ({
+
+}) => {
+  return (
+    <div className="MainDashboard">
+        <Analytices/>
+    </div>
+  );
+};
+
+export default MainDashboard;

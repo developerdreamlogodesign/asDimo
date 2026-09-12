@@ -103,7 +103,7 @@ export const fetchWithTokenRefresh = async (
   url: string,
   options: RequestInit = {}
 ): Promise<Response> => {
-  const accessToken = tokenManager.getAccessToken();
+  let accessToken = tokenManager.getAccessToken();
 
   if (!accessToken) {
     // No token, return original fetch
@@ -116,6 +116,7 @@ export const fetchWithTokenRefresh = async (
     if (!newToken) {
       throw new Error("Failed to refresh token");
     }
+    accessToken = newToken;
   }
 
   // Add authorization header

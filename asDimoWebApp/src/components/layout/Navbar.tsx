@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
 import "./layout.css";
-// import user from "../../assets/Images/user.png";
+import {MenuIcon} from 'lucide-animated';
 import { BellIcon } from "lucide-animated";
 import { authService } from "../../services/authService";
 import { tokenManager } from "../../services/tokenManager";
 import { filebasename } from "../../api/config";
+import { getCurrentUserRole } from "../../middleware/AuthMiddleware";
 
 interface NavbarProps {
   toggle: () => void;
@@ -33,6 +34,14 @@ const Navbar: React.FC<NavbarProps> = ({ toggle }) => {
         return "Zonal Admin";
       case 7:
         return "Admin";
+      case 5:
+        return "Therapist (Global)";
+      case 4:
+        return "Parent (Global)";
+      case 3:
+        return "Therapist";
+      case 2:
+        return "Parent";
       default:
         return "Admin";
     }
@@ -142,7 +151,24 @@ const Navbar: React.FC<NavbarProps> = ({ toggle }) => {
         const response =
           await authService.getNotifications(token);
 
-        setNotifications(response?.data || []);
+        let notificationData = response?.data || [];
+
+        // Filter notifications for teachersGlobal users
+        const role = getCurrentUserRole();
+        const user = tokenManager.getUser();
+        
+        if (role === "teachersGlobal" && user?.userId) {
+          notificationData = notificationData.filter((notification: any) => {
+            // Show only notifications related to this teacher/therapist
+            return (
+              notification.recipientId === user.userId ||
+              notification.teacherId === user.userId ||
+              notification.userId === user.userId
+            );
+          });
+        }
+
+        setNotifications(notificationData);
       } catch (error) {
         console.error(
           "Failed to load notifications:",
@@ -183,9 +209,9 @@ const Navbar: React.FC<NavbarProps> = ({ toggle }) => {
   
   return (
     <div className="navbar">
-      <span className="menu-toggle" onClick={toggle}>
-        ☰
-      </span>
+      <div className="menu-toggle" onClick={toggle}>
+        <MenuIcon/>
+      </div>
 
       {/* <h3>{profileRole}</h3> */}
 
