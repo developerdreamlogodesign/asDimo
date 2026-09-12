@@ -25,12 +25,22 @@
      --GreenButtonHover: #DAEBE8;
      --GreenActiveColor: #D0E3D6;
      --ColorBlue: #3b82f6;
+     --ColorSky: #23B7E5;
      --GreyBorders: #DEDEDE;
      --NeonGreen: #67A401;
      --TranshparentGreen: #05413834;
      --lightBackground: #E9E9E9;
      --ColorDenger: #dc2626;
      --ColorDengerHover: #fecaca;
+     --TableHeader: #e7f5eb;
+     --CompleteStatus: #66C232;
+     --CancleStstus: #FF7068;
+     --RescheduleStstus: #16467B;
+     --UpcomingStatus: #ED9624;
+     --YellowButton: #FFD713;
+     --LightGreen: #F1F4F9;
+     --LightPurple: #E8D2FF;
+     --Purple: #6C27B3;
  } 
 
 body{ font-family: "SourceSans", sans-serif; }
@@ -38,4 +48,6 @@ body{ font-family: "SourceSans", sans-serif; }
 .d-flex{display: flex;}
 .boxShadow{box-shadow: 0px 0px 11px #d1d1d3; border-radius: 15px; padding: 30px 30px 35px; margin-bottom: 30px;}
 button:focus-visible{outline: solid 0px;}
+.PlusIcon{rotate: 45deg; padding-right: 6px; margin-left: -15px; margin-bottom: -10px;}
+.card {background: #ffffff; border-radius: 16px; padding: 20px; box-shadow: 0 4px 12px rgba(30, 45, 65, 0.10); }
 /* Global CSS End */

@@ -1,12 +1,12 @@
 import React from "react";
-import "./temp.css";
+import "./UIstyles.css";
 
 interface GlobalButtons {
   text: string;
   onClick?: () => void;
   type?: "button" | "submit" | "reset";
   textsize?: "sm" | "md" | "lg";
-  variant?: "trashparent" | "solid" | "red" | "greyborder" | "neon" | "DarkGreen" | "blueborder" | "string";
+  variant?: "trashparent" | "solid" | "red" | "greyborder" | "neon" | "DarkGreen" | "blueborder" | "string" | "greenBorder" | "SolidBlue" | "SolidNeon" | "SolidYellow" | "redborder" | "OrangeSolid";
   icon?: React.ReactNode;
   disabled?: boolean;
   className?: string;

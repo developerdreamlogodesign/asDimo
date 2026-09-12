@@ -37,6 +37,119 @@ const ViewProfileDetails: React.FC<Props> = ({ userId }) => {
   const [address, setAddress] = useState("");
   const [country, setCountry] = useState("");
   const [id, setId] = useState("");
+  const [assignmemberList, setASMemberList] = useState<any[]>([]);
+  const [aslistTitle, setASListTitle] = useState("Assigned to Zonal Admin");
+  const [selectedAdminName, setSelectedAdminName] = useState("");
+  const [selectedAdminId, setSelectedAdminId] = useState("");
+  // const [adminName, setadminName] = useState("");
+
+  const fetchAssignedMembers = async (
+  flag: number,
+  currentUserZonalAdminId?: number
+) => {
+  try {
+    const token = tokenManager.getAccessToken();
+
+    if (!token) return;
+
+    let targetFlag: number | null = null;
+
+    if (flag === 7) {
+      // Admin -> show Zonal Admins
+      targetFlag = 6;
+      setASListTitle("Assigned to Zonal Admin");
+    } else if (flag === 1) {
+      // Organization Admin -> show Admins
+      targetFlag = 7;
+      setASListTitle("Assigned to Admin");
+    } else if (flag === 3) {
+      // Zonal Admin -> show Organization Admins
+      targetFlag = 1;
+      setASListTitle("Assigned to Organization Admin");
+    } else {
+      setASMemberList([]);
+      return;
+    }
+
+    const response = await authService.getUsersByFlag(
+      token,
+      targetFlag
+    );
+
+    let users = response?.data || [];
+
+    // Organization Admin:
+    // Only show admins belonging to the same Zonal Admin
+    if (flag === 1) {
+      users = users.filter(
+        (admin: any) =>
+          admin?.roleData?.zonalAdminId === currentUserZonalAdminId
+      );
+    }
+
+    setASMemberList(users);
+  } catch (error) {
+    console.error(
+      "Failed to load assigned members:",
+      error
+    );
+
+    setASMemberList([]);
+  }
+};
+
+const handleAssignedUserSave = async (
+  selectedUserId: number | string
+) => {
+  try {
+    const token = tokenManager.getAccessToken();
+
+    if (!token) {
+      console.error("Authentication token not found");
+      return;
+    }
+
+    if (!id) {
+      console.error("Current user ID not found");
+      return;
+    }
+
+    if (!selectedUserId) {
+      console.error("Please select a user");
+      return;
+    }
+
+    // Only Admin (7) and Organization Admin (1)
+    if (userFlag !== 7 && userFlag !== 1) {
+      return;
+    }
+
+    const payload = {
+      flag: userFlag,
+      userId: Number(id),
+      updatedUserId: Number(selectedUserId),
+    };
+
+    console.log("updateUserRelation payload:", payload);
+
+    const response = await authService.updateUserRelation(
+      token,
+      payload
+    );
+
+    console.log(
+      "User relation updated successfully:",
+      response
+    );
+
+    window.location.reload();
+  } catch (error) {
+    console.error(
+      "Failed to update user relation:",
+      error
+    );
+  }
+};
 
   const handleImageChange = async (file: File) => {
     try {
@@ -160,8 +273,23 @@ const [showResetModal, setShowResetModal] = useState(false);
         const res = await authService.getUserById(token, userId);
 
         const user = res?.data || res;
-        // console.log("Fetched user data:", user);
         // console.log("Fetched user flag:", user.flag);
+        // console.log("Fetched user data:", user);
+
+
+        if(user.flag == 7){
+          // console.log("Fetched user data:", user.relatedData?.zonalAdmin?.name);
+          setSelectedAdminName(user.relatedData?.zonalAdmin?.name || "");
+          setSelectedAdminId(user.relatedData?.zonalAdmin?.userId || "");
+        }else if(user.flag == 3){
+          setSelectedAdminName(user.relatedData?.organizations?.name || "");
+          setSelectedAdminId(user.relatedData?.organizations?.userId || "");
+        }else{
+          // console.log("Fetched user data:", user.relatedData?.Admin?.name);
+          setSelectedAdminName(user.relatedData?.Admin?.name || "");
+          setSelectedAdminId(user.relatedData?.Admin?.userId || "");
+
+        }
 
         if (!user) return;
 
@@ -170,6 +298,7 @@ const [showResetModal, setShowResetModal] = useState(false);
         (user.relatedData?.organizations?.count || 0) +
         (user.relatedData?.teachers?.count || 0) +
         (user.relatedData?.parents?.count || 0);
+
 
         setTotalUsers(totalRelatedUsers);
 
@@ -184,10 +313,17 @@ const [showResetModal, setShowResetModal] = useState(false);
         setPincode(user.pincode || "");
         setAddress(user.address || "");
         setCountry(user.country || "");
-        setId(user.id || user._id || "");
+        // setId(user.id || user._id || "");
+        setId(user.userId || user.id || user._id || "");
         // setLastLogin(user.lastLogin || "");
 
-        console.log(user);
+        await fetchAssignedMembers(
+          user.flag,
+          user.roleData?.zonalAdminId
+        );
+
+        // console.log(user);
+        // console.log("zonalAdminIdzonalAdminId",zonalAdminId);
 
         setZone(
           `${user.city || ""}${
@@ -215,6 +351,7 @@ const [showResetModal, setShowResetModal] = useState(false);
 
           case 7:
             setListTitle("Organization List");
+            setASListTitle("Assigned to Zonal Admin");
             setMemberList(
               (user.relatedData?.organizations?.data || []).map(
                 (organization: any) => ({
@@ -230,6 +367,7 @@ const [showResetModal, setShowResetModal] = useState(false);
 
             case 3:
               setListTitle("Patient List");
+              setASListTitle("Assigned to Organization");
               setMemberList(
                 (user.relatedData?.parents?.data || []).map(
                   (parent: any) => ({
@@ -242,6 +380,7 @@ const [showResetModal, setShowResetModal] = useState(false);
 
           default:
             setListTitle("Organization List");
+            setASListTitle("Assigned to Admin");
             setMemberList(
               (user.relatedData?.organizations?.data ||
                 user.relatedData?.admins?.data ||
@@ -323,6 +462,34 @@ const [showResetModal, setShowResetModal] = useState(false);
           <ProfileField label="Email" value={email} editable={false} /> 
           <ProfileField label="Phone" value={phone} onSave={(value) => updateField("phone", value) } />
           <ProfileField label="Zone" value={zone} editable={true} onClick={() => setShowResetModal(true)} />
+          {/* {userFlag !== 6 && (
+            <ProfileField
+              label={aslistTitle}
+              value="Dropdwon Value"
+              isDropdown
+              // options={assignmemberList.map((assignmember: any) => ({
+              //   label: assignmember.name,
+              //   value: assignmember.userId,
+              // }))}
+              onSave={(value) => console.log(value)}
+            />
+          )} */}
+
+          {(userFlag === 7 || userFlag === 1 || userFlag === 3) && (
+              <ProfileField
+                label={aslistTitle}
+                value={selectedAdminName || "Select"}
+                isDropdown
+                options={assignmemberList.map((assignmember: any) => ({
+                  label: assignmember.name,
+                  value: assignmember.userId,
+                  disabled: String(assignmember.userId) === String(selectedAdminId),
+                }))}
+                onSave={(value) => {
+                   handleAssignedUserSave(value);
+                }}
+              />
+            )}
         </div>
 
         <div className="boxShadow">

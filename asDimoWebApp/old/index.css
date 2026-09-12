@@ -1,0 +1,41 @@
+*{ margin: 0; padding: 0;box-sizing: border-box;}
+@font-face {
+  font-family: "SourceSans";
+  src: url("/src/assets/Font/SourceSansRegular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "SourceSans";
+  src: url("/src/assets/Font/SourceSansSemiBold.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+}
+
+:root{
+     --PrimaryColor: #82C9BE; 
+     --SecondayColor: #369183;
+     --DarkGreen: #1f665b;
+     --TextcolorDark: #464255;
+     --TextcolorBlack: #000;
+     --TextcolorGrey: #A5AEBF;
+     --TextcolorLight: #ffff;
+     --BorderColor: #b4b2bb;
+     --GreenButtonHover: #DAEBE8;
+     --GreenActiveColor: #D0E3D6;
+     --ColorBlue: #3b82f6;
+     --GreyBorders: #DEDEDE;
+     --NeonGreen: #67A401;
+     --TranshparentGreen: #05413834;
+     --lightBackground: #E9E9E9;
+     --ColorDenger: #dc2626;
+     --ColorDengerHover: #fecaca;
+ } 
+
+body{ font-family: "SourceSans", sans-serif; }
+/* Global CSS Start */
+.d-flex{display: flex;}
+.boxShadow{box-shadow: 0px 0px 11px #d1d1d3; border-radius: 15px; padding: 30px 30px 35px; margin-bottom: 30px;}
+button:focus-visible{outline: solid 0px;}
+/* Global CSS End */

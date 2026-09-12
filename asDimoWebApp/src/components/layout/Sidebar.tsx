@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import "./layout.css";
-import "../../components/ui/temp.css";
+import "../../components/ui/UIstyles.css";
 import { NavLink } from "react-router-dom";
-
 import { routes } from "../../routes/AppRoutes";
 import { useLogout } from "../../services/useLogout";
 
@@ -16,6 +15,7 @@ import UserIcon from "../../assets/Images/UserIcon.svg";
 import AppointmentIcon from "../../assets/Images/AppointmentIcon.svg";
 import SettingsIcon from "../../assets/Images/SettingsIcon.svg";
 import LogOutIcon from "../../assets/Images/LogOutIcon.svg";
+import ReportIcon from "../../assets/Images/ReportIcon.svg";
 import DashboardButtons from "../ui/Buttons";
 import ModalBox from "../ui/ModalBox";
 import { getCurrentUserRole } from "../../middleware/AuthMiddleware";
@@ -59,26 +59,57 @@ const menuConfig = {
     { name: "Organization", path: routes.SUP_ORGANIZATION, icon: ORGicon, },
     { name: "Doctors/Therapist", path: routes.SUP_THERAPIST, icon: DoctorIcon, },
     { name: "Users/Parents", path: routes.SUP_PARENT, icon: UserIcon, },
+    { name: "Report", path: routes.SUP_REPORT, icon: ReportIcon, },
     { name: "Appointments", path: routes.SUP_APPOINTMENT, icon: AppointmentIcon, },
     { name: "Settings", path: routes.SUPERADMIN_SETTINGS, icon: SettingsIcon, }
   ],
 
-
   zonalAdmin: [
     { name: "Dashboard", path: routes.ZONALADMIN, icon: DashBoardIcon, },
+    { name: "Admin", path: routes.ZONAL_ADMIN, icon: AdminIcon, },
+    { name: "Organization", path: routes.ZONAL_ORGANIZATION, icon: ORGicon, },
+    { name: "Doctors/Therapist", path: routes.ZONAL_THERAPIST, icon: DoctorIcon, },
+    { name: "Users/Parents", path: routes.ZONAL_PARENT, icon: UserIcon, },
+    { name: "Report", path: routes.ZONAL_REPORT, icon: ReportIcon, },
+    { name: "Appointments", path: routes.ZONAL_APPOINTMENT, icon: AppointmentIcon, },
     { name: "Settings", path: routes.ZONAL_SETTINGS, icon: SettingsIcon, }
   ],
+
+    Admin: [
+      { name: "Dashboard", path: routes.ADMIN, icon: DashBoardIcon, },
+      { name: "Organization", path: routes.ADMIN_ORGANIZATION, icon: ORGicon, },
+      { name: "Doctors/Therapist", path: routes.ADMIN_THERAPIST, icon: DoctorIcon, },
+      { name: "Users/Parents", path: routes.ADMIN_PARENT, icon: UserIcon, },
+      { name: "Report", path: routes.ADMIN_REPORT, icon: ReportIcon, },
+      { name: "Appointments", path: routes.ADMIN_APPOINTMENT, icon: AppointmentIcon, },
+      { name: "Settings", path: routes.ADMIN_SETTINGS, icon: SettingsIcon, }
+    ],
 
 
   OrganizationAdmin: [
     { name: "Dashboard", path: routes.ORGANIZATIONADMIN, icon: DashBoardIcon, },
+    { name: "Doctors/Therapist", path: routes.ORGANIZATIONADMIN_THERAPIST, icon: DoctorIcon, },
+    { name: "Users/Parents", path: routes.ORGANIZATIONADMIN_PARENT, icon: UserIcon, },
+    { name: "Report", path: routes.ORGANIZATIONADMIN_REPORT, icon: ReportIcon, },
+    { name: "Appointments", path: routes.ORGANIZATIONADMIN_APPOINTMENT, icon: AppointmentIcon, },
     { name: "Settings", path: routes.ORGANIZATION_SETTINGS, icon: SettingsIcon, }
   ],
 
+  TeachersOrg: [
+    { name: "Dashboard", path: routes.THERAPIST, icon: DashBoardIcon, },
+    { name: "Users/Parents", path: routes.THERAPIST_PARENT, icon: UserIcon, },
+    { name: "Report", path: routes.THERAPIST_REPORT, icon: ReportIcon, },
+    { name: "Appointments", path: routes.THERAPIST_APPOINTMENT, icon: AppointmentIcon, },
+    { name: "Settings", path: routes.THERAPIST_SETTINGS, icon: SettingsIcon, }
+  ],
 
-  Admin: [
-    { name: "Dashboard", path: routes.ADMIN, icon: DashBoardIcon, },
-    { name: "Settings", path: routes.ADMIN_SETTINGS, icon: SettingsIcon, }
+  teachersGlobal: [
+    { name: "Dashboard", path: routes.ORGANIZATIONADMIN, icon: DashBoardIcon, },
+    { name: "Doctors/Therapist", path: routes.ORGANIZATIONADMIN_THERAPIST, icon: DoctorIcon, },
+    { name: "Users/Parents", path: routes.ORGANIZATIONADMIN_PARENT, icon: UserIcon, },
+    { name: "Report", path: routes.ORGANIZATIONADMIN_REPORT, icon: ReportIcon, },
+    { name: "Appointments", path: routes.ORGANIZATIONADMIN_APPOINTMENT, icon: AppointmentIcon, },
+    { name: "Settings", path: routes.ORGANIZATION_SETTINGS, icon: SettingsIcon, }
   ],
 
 };
@@ -111,7 +142,8 @@ const menuItems =
               item.path === routes.SUPERADMIN ||
               item.path === routes.ZONALADMIN ||
               item.path === routes.ORGANIZATIONADMIN ||
-              item.path === routes.ADMIN;
+              item.path === routes.ADMIN ||
+              item.path === routes.THERAPIST;
 
             return (
               <li key={item.name}>

@@ -1,2 +1,14 @@
-const AdminIndex = () => <h1>Admin Page</h1>;
-export default AdminIndex;
+import React from "react";
+import Analytices from "../../components/modules/Analytices";
+
+const MainDashboard: React.FC= ({
+
+}) => {
+  return (
+    <div className="MainDashboard">
+        <Analytices/>
+    </div>
+  );
+};
+
+export default MainDashboard;

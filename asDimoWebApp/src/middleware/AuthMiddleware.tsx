@@ -41,6 +41,8 @@ export const routeByRoleType: Partial<
   OrganizationAdmin: routes.ORGANIZATIONADMIN,
   zonalAdmin: routes.ZONALADMIN,
   Admin: routes.ADMIN,
+  TeachersOrg: routes.THERAPIST,
+  teachersGlobal: routes.ORGANIZATIONADMIN,
 };
 
 export const getRoleTypeByFlag = (

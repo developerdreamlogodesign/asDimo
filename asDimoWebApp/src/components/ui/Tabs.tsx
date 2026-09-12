@@ -1,14 +1,15 @@
 import React, { useState } from "react";
-import "./temp.css";
+import "./UIstyles.css";
 
 interface Tab {
-  label: string;
+  id: string;
+  label: React.ReactNode;
   content: React.ReactNode;
 }
 
 interface TabsProps {
   tabs: Tab[];
-  variant?: "default" | "underline" | "LeftSide" ;
+  variant?: "default" | "underline" | "LeftSide" | "Horizontal" ;
 }
 
 const Tabs: React.FC<TabsProps> = ({
@@ -22,7 +23,7 @@ const Tabs: React.FC<TabsProps> = ({
       <div className="tabs-header">
         {tabs.map((tab, index) => (
           <div
-            key={tab.label || index}
+            key={index}
             className="TabButton"
           >
             <button

@@ -11,6 +11,14 @@
 .error-text{color: red; font-size: 14px; margin-top: 5px;}
 
 
-
+/* Responsive Start */
+@media (max-width: 768px) {
+    /* Auth Start */
+    .FormContainer{padding: 30px; height: 78vh;}
+    .FormContainer .IndexHeader{left: 0; right: 0; display: flex; justify-self: center; top: 35px;}
+    .FormContainer .IndexHeader img{ width: 180px;}
+    /* Auth End */
+}
+/* Responsive End */
 
 

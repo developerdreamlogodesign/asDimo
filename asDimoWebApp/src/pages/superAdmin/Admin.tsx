@@ -1,11 +1,15 @@
 // import AdminList from "../../components/modules/AdminList";
 import ZonalAdminList from "../../components/modules/GlobalTableList";
 import { Heading1 } from "../../components/ui/HeadingPara";
+import { getCurrentUserRole } from "../../middleware/AuthMiddleware";
 
 const SupAdmin: React.FC = () => {
+  const role = getCurrentUserRole();
+  const filterByZonalAdminId = role === "zonalAdmin";
+
   return (
     <>
-      <Heading1 text="Admin" />
+      <Heading1 text="Admin List" />
       {/* <AdminList /> */}
       <ZonalAdminList
         flag={7}
@@ -17,6 +21,7 @@ const SupAdmin: React.FC = () => {
           { key: "subscription", title: "Subscription", sortable: true },
           { key: "pe", title: "PE", sortable: true },
         ]}
+        filterByZonalAdminId={filterByZonalAdminId}
       />
     </>
   );

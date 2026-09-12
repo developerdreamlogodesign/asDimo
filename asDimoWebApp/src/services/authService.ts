@@ -322,4 +322,71 @@ export const authService = {
       return response.data;
     },
 
+  getAppoinments: async (token: string) => {
+    const response = await axios.get(`${BASE_URL}/appointments`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return response.data;
+  },
+
+  async getUserCounts(token: string) {
+    const response = await axios.get(`${BASE_URL}/dashboard/user-counts`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return response.data;
+  },
+
+  async getAllUsersByRelation(token: string,flag: number,userId: number,options: GetUsersByFlagOptions = {}): Promise<UserListResponse> {
+    const payload = {
+      flag,
+      userId,
+      ...(options.search ? { search: options.search } : {}),
+      ...(options.sort ? { sort: options.sort } : {}),
+      ...(options.sortBy ? { sortBy: options.sortBy } : {}),
+      ...(options.sortOrder ? { sortOrder: options.sortOrder } : {}),
+    };
+    
+    const response = await axios.post(
+      `${BASE_URL}/auth/getAllUsersByRelation`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    return response.data;
+  },
+
+  updateUserRelation: async (
+    token: string,
+    payload: {
+      flag: number;
+      userId: number | string;
+      updatedUserId: number | string;
+    }
+  ) => {
+    const response = await axios.put(
+      `${BASE_URL}/auth/updateUserRelation`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    return response.data;
+  },
+
 };
+
+

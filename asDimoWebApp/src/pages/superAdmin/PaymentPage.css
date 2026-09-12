@@ -1,0 +1,52 @@
+.payment-page {
+  min-height: calc(100vh - 145px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 460px);
+  align-items: center;
+  gap: 72px;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 42px 0;
+  color: var(--TextcolorDark);
+}
+
+.payment-intro { max-width: 560px; }
+.payment-kicker { color: var(--SecondayColor); font-size: 12px; font-weight: 600; letter-spacing: 1.6px; }
+.payment-intro h1 { margin: 14px 0 16px; font-size: clamp(32px, 5vw, 54px); line-height: 1.02; font-weight: 500; }
+.payment-intro > p { max-width: 480px; color: var(--TextcolorGrey); font-size: 18px; line-height: 1.55; }
+.payment-trust { display: flex; align-items: center; gap: 8px; margin-top: 28px; color: var(--DarkGreen); font-size: 14px; }
+
+.payment-panel { background: #fff; border: 1px solid var(--GreyBorders); border-radius: 16px; padding: 30px; box-shadow: 0 18px 48px rgba(54, 145, 131, 0.12); }
+.payment-panel-header { display: flex; align-items: center; gap: 12px; padding-bottom: 24px; margin-bottom: 22px; border-bottom: 1px solid var(--GreyBorders); }
+.payment-panel-header h2, .payment-success h2 { margin: 0; font-size: 22px; font-weight: 500; }
+.payment-panel-header p, .payment-success p { margin: 4px 0 0; color: var(--TextcolorGrey); font-size: 14px; }
+.payment-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 10px; color: var(--DarkGreen); background: var(--GreenButtonHover); }
+.payment-panel label { display: block; margin: 18px 0 8px; font-size: 14px; font-weight: 500; }
+.payment-panel label span { color: var(--TextcolorGrey); font-weight: 400; }
+.payment-panel input { width: 100%; min-height: 48px; border: 1px solid var(--GreyBorders); border-radius: 8px; padding: 0 14px; color: var(--TextcolorDark); background: #fff; font: inherit; font-size: 16px; }
+.payment-panel input:focus { outline: 2px solid rgba(54, 145, 131, 0.25); border-color: var(--SecondayColor); }
+.payment-amount-input { display: flex; align-items: center; border: 1px solid var(--GreyBorders); border-radius: 8px; overflow: hidden; }
+.payment-amount-input:focus-within { outline: 2px solid rgba(54, 145, 131, 0.25); border-color: var(--SecondayColor); }
+.payment-amount-input span { padding-left: 14px; color: var(--TextcolorGrey); font-size: 20px; }
+.payment-amount-input input { border: 0; outline: 0; }
+.payment-summary { display: flex; justify-content: space-between; gap: 16px; margin: 22px 0; padding: 14px 0; border-top: 1px solid var(--GreyBorders); border-bottom: 1px solid var(--GreyBorders); font-size: 14px; }
+.payment-summary span { color: var(--TextcolorGrey); }
+.payment-summary strong { font-weight: 500; text-align: right; }
+.payment-message { margin: 14px 0; color: var(--ColorDenger); font-size: 14px; }
+.payment-note { margin: 14px 0 0; color: var(--TextcolorGrey); text-align: center; font-size: 12px; }
+.payment-success { min-height: 330px; display: grid; align-content: center; justify-items: center; text-align: center; color: var(--DarkGreen); }
+.payment-success h2 { margin-top: 18px; }
+.payment-success p { max-width: 260px; }
+.payment-success small { margin-top: 18px; color: var(--TextcolorGrey); }
+.payment-spinner { animation: payment-spin 0.9s linear infinite; }
+
+@keyframes payment-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 820px) {
+  .payment-page { grid-template-columns: 1fr; gap: 32px; padding: 20px 0 40px; }
+  .payment-intro h1 { font-size: 40px; }
+}
+
+@media (max-width: 480px) {
+  .payment-panel { padding: 22px; }
+}
