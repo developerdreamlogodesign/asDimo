@@ -1,5 +1,5 @@
 // Headings Start
-import "./UIStyles.css";
+import "./UIstyles.css";
 
 export const Heading1 = ({ text }: { text: string }) => (
   <h1 className="PageTitle">{text}</h1>
