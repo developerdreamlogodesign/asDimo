@@ -8,8 +8,127 @@ import Teacher from "../models/teachers.model.js";
 import OrganizationAdmin from "../models/organizationAdmin.model.js";
 import ZonalAdmin from "../models/zonalAdmin.model.js";
 import Admin from "../models/admin.model.js";
+import children from "../models/child.model.js";
+
+const normalizeAppointmentRequests = (data) => {
+  if (Array.isArray(data)) {
+    return {
+      isMultiple: true,
+      items: data,
+    };
+  }
+
+  const slotList = data?.slots || data?.appointments || data?.schedules;
+  if (Array.isArray(slotList)) {
+    return {
+      isMultiple: true,
+      items: slotList.map((slot) => ({
+        ...data,
+        ...slot,
+      })),
+    };
+  }
+
+  if (Array.isArray(data?.date) && Array.isArray(data?.time)) {
+    let items = [];
+    if (data.date.length === data.time.length) {
+      items = data.date.map((d, idx) => ({
+        ...data,
+        date: d,
+        time: data.time[idx],
+      }));
+    } else if (data.date.length === 1) {
+      items = data.time.map((t) => ({
+        ...data,
+        date: data.date[0],
+        time: t,
+      }));
+    } else if (data.time.length === 1) {
+      items = data.date.map((d) => ({
+        ...data,
+        date: d,
+        time: data.time[0],
+      }));
+    } else {
+      const error = new Error(
+        "When both date and time are arrays, they must have the same length (or one must have length 1)"
+      );
+      error.statusCode = 400;
+      throw error;
+    }
+
+    return {
+      isMultiple: true,
+      items,
+    };
+  }
+
+  if (Array.isArray(data?.date)) {
+    return {
+      isMultiple: true,
+      items: data.date.map((d) =>
+        typeof d === "object" && d !== null
+          ? { ...data, ...d }
+          : { ...data, date: d, time: data.time }
+      ),
+    };
+  }
+
+  if (Array.isArray(data?.time)) {
+    return {
+      isMultiple: true,
+      items: data.time.map((t) =>
+        typeof t === "object" && t !== null
+          ? { ...data, ...t }
+          : { ...data, date: data.date, time: t }
+      ),
+    };
+  }
+
+  return {
+    isMultiple: false,
+    items: [data],
+  };
+};
 
 export const createAppointment = async (data) => {
+  const { isMultiple, items } = normalizeAppointmentRequests(data);
+
+  if (!items || items.length === 0) {
+    const error = new Error("Please provide appointment details");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (items.length > 1) {
+    for (const item of items) {
+      const availability = await Availability.findOne({
+        userId: item.doctorId || item.teacherId,
+        date: item.date,
+        time: item.time,
+        isBooked: false,
+      });
+
+      if (!availability) {
+        const error = new Error(
+          `No availability found for requested slot (${item.date} ${item.time})`
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+  }
+
+  const createdAppointments = [];
+  for (const item of items) {
+    const created = await createSingleAppointment(item);
+    createdAppointments.push(created);
+  }
+
+  return isMultiple ? createdAppointments : createdAppointments[0];
+};
+
+const createSingleAppointment = async (data) => {
   const availability = await Availability.findOne({
     userId: data.doctorId || data.teacherId,
     date: data.date,
@@ -23,14 +142,40 @@ export const createAppointment = async (data) => {
     throw error;
   }
 
+  const paymentStatus =
+    data.paymentId === null ||
+    data.paymentId === undefined ||
+    String(data.paymentId).trim() === ""
+      ? "pending"
+      : data.paymentStatus || "completed";
+
+  const status =
+    paymentStatus === "pending"
+      ? "pending"
+      : paymentStatus === "completed"
+        ? "approved"
+        : data.status || "pending";
+
   const appointment = await Appointment.create({
     parentId: data.parentId,
     teacherId: data.teacherId || data.doctorId,
     availabilityId: availability._id,
     date: data.date,
     time: data.time,
-    status: data.status || "pending",
+    status,
+    // status: data.status || "pending",
+    paymentId: data.paymentId ?? null,
+    ...(data.amount !== undefined && data.amount !== null && data.amount !== ""
+      ? { amount: Number(data.amount) }
+      : {}),
+    paymentStatus:
+      data.paymentId === null ||
+      data.paymentId === undefined ||
+      String(data.paymentId).trim() === ""
+        ? "pending"
+        : data.paymentStatus || "completed",
     zoomLink: availability.zoomLink,
+    doneBy: data.doneBy || "parent",
   });
 
     const AvailabilityUp = await Availability.findByIdAndUpdate(availability._id, {
@@ -125,13 +270,253 @@ export const createAppointment = async (data) => {
 };
 
 // export const getAppointments = async () => {
+//   const appointments = await Appointment.find().sort({ createdAt: -1 }).lean();
+
+//     const enrichedAppointments = await Promise.all(
+//       appointments.map(async (appointment) => {
+
+//         // 1. Get teacher first
+//         const teacher = await Teacher.findOne({
+//           teacherId: appointment.teacherId,
+//         }).lean();
+
+//         // 2. Now get all other related data
+//         const [
+//           teacherUser,
+//           parent,
+//           parentUser,
+//           organization,
+//           zonalAdmin,
+//           admin,
+//           availability,
+//         ] = await Promise.all([
+//           User.findOne({
+//             userId: appointment.teacherId,
+//           }).lean(),
+
+//           Parent.findOne({
+//             parentId: appointment.parentId,
+//           }).lean(),
+
+//           User.findOne({
+//             userId: appointment.parentId,
+//           }).lean(),
+
+//           teacher?.organizationId
+//             ? User.findOne({
+//                 userId: teacher.organizationId,
+//               }).lean()
+//             : null,
+
+//           teacher?.zonalAdminId
+//             ? User.findOne({
+//                 userId: teacher.zonalAdminId,
+//               }).lean()
+//             : null,
+
+//           teacher?.adminId
+//             ? User.findOne({
+//                 userId: teacher.adminId,
+//               }).lean()
+//             : null,
+
+//           // Get Availability using Appointment availabilityId
+//           appointment.availabilityId
+//             ? Availability.findById(appointment.availabilityId).lean()
+//             : null,
+//         ]);
+
+//         return {
+//           ...appointment,
+
+//           teacher,
+//           teacherUser,
+//           parent,
+//           parentUser,
+//           organization,
+//           zonalAdmin,
+//           admin,
+
+//           // NEW
+//           availability,
+//         };
+//       })
+//     );
+//   return enrichedAppointments;
+// };
+
+export const getAppointments = async ({
+  search = "",
+  sortBy = "",
+  sortOrder = "asc",
+  status = "",
+  medium = "",
+  teacherId = null,
+} = {}) => {
+  // 1. Build base query for Appointment collection
+  const query = {};
+  if (teacherId) {
+    query.teacherId = Number(teacherId);
+  }
+  if (status) {
+    query.status = new RegExp(`^${status}$`, "i");
+  }
+
+  // 2. Fetch base appointments
+  const appointments = await Appointment.find(query).sort({ createdAt: -1 }).lean();
+
+  // 3. Enrich appointments with Teacher, Parent, Users, and Availability
+  let enrichedAppointments = await Promise.all(
+    appointments.map(async (appointment) => {
+      // Get teacher first
+      const teacher = await Teacher.findOne({
+        teacherId: appointment.teacherId,
+      }).lean();
+
+      // Get related details in parallel
+      const [
+        teacherUser,
+        parent,
+        parentUser,
+        organization,
+        zonalAdmin,
+        admin,
+        availability,
+      ] = await Promise.all([
+        User.findOne({ userId: appointment.teacherId }).select("-password").lean(),
+        Parent.findOne({ parentId: appointment.parentId }).lean(),
+        User.findOne({ userId: appointment.parentId }).select("-password").lean(),
+        teacher?.organizationId
+          ? User.findOne({ userId: teacher.organizationId }).select("-password").lean()
+          : null,
+        teacher?.zonalAdminId
+          ? User.findOne({ userId: teacher.zonalAdminId }).select("-password").lean()
+          : null,
+        teacher?.adminId
+          ? User.findOne({ userId: teacher.adminId }).select("-password").lean()
+          : null,
+        appointment.availabilityId
+          ? Availability.findById(appointment.availabilityId).lean()
+          : null,
+      ]);
+
+      return {
+        ...appointment,
+        teacher,
+        teacherUser,
+        parent,
+        parentUser,
+        organization,
+        zonalAdmin,
+        admin,
+        availability,
+      };
+    })
+  );
+
+  // 4. Medium filtering (online, home, center/clinic) if requested
+  if (medium) {
+    const med = medium.toLowerCase().trim();
+    enrichedAppointments = enrichedAppointments.filter((item) => {
+      const itemMed = (item.availability?.medium || (item.zoomLink ? "online" : "")).toLowerCase().trim();
+      if (med === "clinic" || med === "center") {
+        return itemMed === "center" || itemMed === "clinic";
+      }
+      return itemMed === med;
+    });
+  }
+
+  // 5. Search filtering across all key fields
+  if (search && search.trim()) {
+    const q = search.trim().toLowerCase();
+    enrichedAppointments = enrichedAppointments.filter((item) => {
+      const parentName = item.parentUser?.name || "";
+      const teacherName = item.teacherUser?.name || "";
+      const orgName = item.organization?.name || "";
+      const zonalName = item.zonalAdmin?.name || "";
+      const adminName = item.admin?.name || "";
+      const date = item.date || "";
+      const time = item.time || "";
+      const statusStr = item.status || "";
+      const mediumStr = item.availability?.medium || "";
+
+      return (
+        parentName.toLowerCase().includes(q) ||
+        teacherName.toLowerCase().includes(q) ||
+        orgName.toLowerCase().includes(q) ||
+        zonalName.toLowerCase().includes(q) ||
+        adminName.toLowerCase().includes(q) ||
+        date.toLowerCase().includes(q) ||
+        time.toLowerCase().includes(q) ||
+        statusStr.toLowerCase().includes(q) ||
+        mediumStr.toLowerCase().includes(q)
+      );
+    });
+  }
+
+  // 6. Sorting
+  if (sortBy) {
+    enrichedAppointments.sort((a, b) => {
+      let va = "";
+      let vb = "";
+
+      if (sortBy === "parent" || sortBy === "parentUser") {
+        va = a.parentUser?.name || "";
+        vb = b.parentUser?.name || "";
+      } else if (sortBy === "teacher" || sortBy === "teacherUser") {
+        va = a.teacherUser?.name || "";
+        vb = b.teacherUser?.name || "";
+      } else if (sortBy === "organization") {
+        va = a.organization?.name || "";
+        vb = b.organization?.name || "";
+      } else if (sortBy === "zonalAdmin") {
+        va = a.zonalAdmin?.name || "";
+        vb = b.zonalAdmin?.name || "";
+      } else if (sortBy === "admin") {
+        va = a.admin?.name || "";
+        vb = b.admin?.name || "";
+      } else {
+        va = a[sortBy] ?? "";
+        vb = b[sortBy] ?? "";
+      }
+
+      const comparison = String(va).localeCompare(String(vb), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+
+      return sortOrder === "desc" ? -comparison : comparison;
+    });
+  }
+
+  return enrichedAppointments;
+};
+
+
+
+// export const getAppointments = async ({
+//   search = "",
+//   sortBy = "",
+//   sortOrder = "asc",
+// }) => {
+//   // const appointments = await Appointment.find().lean();
 //   const appointments = await Appointment.find().lean();
 
-//   const enrichedAppointments = await Promise.all(
+//   let enrichedAppointments = await Promise.all(
 //     appointments.map(async (appointment) => {
-//       const [teacher, parent] = await Promise.all([
-//         Teacher.findOne({ userId: appointment.teacherId }).lean(),
-//         Parent.findOne({ userId: appointment.parentId }).lean(),
+//       const [teacher, parent, childDetails] = await Promise.all([
+//         Teacher.findOne({
+//           userId: appointment.teacherId,
+//         }).lean(),
+
+//         Parent.findOne({
+//           userId: appointment.parentId,
+//         }).lean(),
+
+//         // Get all children against parent's parentId
+//         children.find({
+//           parentId: appointment.parentId,
+//         }).lean(),
 //       ]);
 
 //       let teacherUser = null;
@@ -140,6 +525,7 @@ export const createAppointment = async (data) => {
 //       let zonalAdmin = null;
 //       let admin = null;
 
+//       // ================= TEACHER USER =================
 //       if (teacher) {
 //         teacherUser = await User.findOne({
 //           userId: teacher.userId,
@@ -148,6 +534,7 @@ export const createAppointment = async (data) => {
 //           .lean();
 //       }
 
+//       // ================= PARENT USERS =================
 //       if (parent) {
 //         [
 //           parentUser,
@@ -155,19 +542,27 @@ export const createAppointment = async (data) => {
 //           zonalAdmin,
 //           admin,
 //         ] = await Promise.all([
-//           User.findOne({ userId: parent.userId })
+//           User.findOne({
+//             userId: parent.userId,
+//           })
 //             .select("-password")
 //             .lean(),
 
-//           User.findOne({ userId: parent.organizationId })
+//           User.findOne({
+//             userId: parent.organizationId,
+//           })
 //             .select("-password")
 //             .lean(),
 
-//           User.findOne({ userId: parent.zonalAdminId })
+//           User.findOne({
+//             userId: parent.zonalAdminId,
+//           })
 //             .select("-password")
 //             .lean(),
 
-//           User.findOne({ userId: parent.adminId })
+//           User.findOne({
+//             userId: parent.adminId,
+//           })
 //             .select("-password")
 //             .lean(),
 //         ]);
@@ -182,6 +577,9 @@ export const createAppointment = async (data) => {
 //         parent,
 //         parentUser,
 
+//         // ================= CHILDREN =================
+//         childDetails,
+
 //         organization,
 //         zonalAdmin,
 //         admin,
@@ -189,170 +587,185 @@ export const createAppointment = async (data) => {
 //     })
 //   );
 
+//   // ================= SEARCH =================
+//   if (search?.trim()) {
+//     const searchText = search.toLowerCase();
+
+//     enrichedAppointments = enrichedAppointments.filter((item) =>
+//       [
+//         item.teacherUser?.name,
+//         item.parentUser?.name,
+//         item.organization?.name,
+//         item.zonalAdmin?.name,
+//         item.admin?.name,
+//         item.status,
+//         item.date,
+
+//         // Search children names too
+//         ...(item.childDetails || []).map((child) => child.name),
+//       ]
+//         .filter(Boolean)
+//         .some((value) =>
+//           value.toLowerCase().includes(searchText)
+//         )
+//     );
+//   }
+
+//   // ================= SORT =================
+//   if (sortBy) {
+//     enrichedAppointments.sort((a, b) => {
+//       let valueA;
+//       let valueB;
+
+//       switch (sortBy) {
+//         case "teacherUser":
+//           valueA = a.teacherUser?.name || "";
+//           valueB = b.teacherUser?.name || "";
+//           break;
+
+//         case "parentUser":
+//           valueA = a.parentUser?.name || "";
+//           valueB = b.parentUser?.name || "";
+//           break;
+
+//         case "organization":
+//           valueA = a.organization?.name || "";
+//           valueB = b.organization?.name || "";
+//           break;
+
+//         case "zonalAdmin":
+//           valueA = a.zonalAdmin?.name || "";
+//           valueB = b.zonalAdmin?.name || "";
+//           break;
+
+//         case "admin":
+//           valueA = a.admin?.name || "";
+//           valueB = b.admin?.name || "";
+//           break;
+
+//         case "date":
+//           valueA = new Date(a.date);
+//           valueB = new Date(b.date);
+//           break;
+
+//         case "status":
+//           valueA = a.status || "";
+//           valueB = b.status || "";
+//           break;
+
+//         default:
+//           return 0;
+//       }
+
+//       if (valueA < valueB) {
+//         return sortOrder === "asc" ? -1 : 1;
+//       }
+
+//       if (valueA > valueB) {
+//         return sortOrder === "asc" ? 1 : -1;
+//       }
+
+//       return 0;
+//     });
+//   }
+
+//   enrichedAppointments = enrichedAppointments.slice(0, 6);
+
 //   return enrichedAppointments;
 // };
 
+// export const getAppointmentById = async (id) => {
+//   const appointment = await Appointment.findById(id).lean();
 
-export const getAppointments = async ({
-  search = "",
-  sortBy = "",
-  sortOrder = "asc",
-}) => {
-  const appointments = await Appointment.find().lean();
+//   if (!appointment) {
+//     return null;
+//   }
 
-  let enrichedAppointments = await Promise.all(
-    appointments.map(async (appointment) => {
-      const [teacher, parent] = await Promise.all([
-        Teacher.findOne({ userId: appointment.teacherId }).lean(),
-        Parent.findOne({ userId: appointment.parentId }).lean(),
-      ]);
+//   const [teacher, parent, childDetails] = await Promise.all([
+//     Teacher.findOne({
+//       userId: appointment.teacherId,
+//     }).lean(),
 
-      let teacherUser = null;
-      let parentUser = null;
-      let organization = null;
-      let zonalAdmin = null;
-      let admin = null;
+//     Parent.findOne({
+//       userId: appointment.parentId,
+//     }).lean(),
 
-      if (teacher) {
-        teacherUser = await User.findOne({
-          userId: teacher.userId,
-        })
-          .select("-password")
-          .lean();
-      }
+//     // Get all children belonging to this parent
+//     children
+//       .find({
+//         parentId: appointment.parentId,
+//       })
+//       .lean(),
+//   ]);
 
-      if (parent) {
-        [
-          parentUser,
-          organization,
-          zonalAdmin,
-          admin,
-        ] = await Promise.all([
-          User.findOne({ userId: parent.userId })
-            .select("-password")
-            .lean(),
+//   let teacherUser = null;
+//   let parentUser = null;
+//   let organization = null;
+//   let zonalAdmin = null;
+//   let admin = null;
 
-          User.findOne({ userId: parent.organizationId })
-            .select("-password")
-            .lean(),
+//   // ================= TEACHER =================
+//   if (teacher) {
+//     teacherUser = await User.findOne({
+//       userId: teacher.userId,
+//     })
+//       .select("-password")
+//       .lean();
+//   }
 
-          User.findOne({ userId: parent.zonalAdminId })
-            .select("-password")
-            .lean(),
+//   // ================= PARENT =================
+//   if (parent) {
+//     [
+//       parentUser,
+//       organization,
+//       zonalAdmin,
+//       admin,
+//     ] = await Promise.all([
+//       User.findOne({
+//         userId: parent.userId,
+//       })
+//         .select("-password")
+//         .lean(),
 
-          User.findOne({ userId: parent.adminId })
-            .select("-password")
-            .lean(),
-        ]);
-      }
+//       User.findOne({
+//         userId: parent.organizationId,
+//       })
+//         .select("-password")
+//         .lean(),
 
-      return {
-        ...appointment,
-        teacher,
-        teacherUser,
-        parent,
-        parentUser,
-        organization,
-        zonalAdmin,
-        admin,
-      };
-    })
-  );
+//       User.findOne({
+//         userId: parent.zonalAdminId,
+//       })
+//         .select("-password")
+//         .lean(),
 
-  // ================= SEARCH =================
-  if (search?.trim()) {
-    const searchText = search.toLowerCase();
+//       User.findOne({
+//         userId: parent.adminId,
+//       })
+//         .select("-password")
+//         .lean(),
+//     ]);
+//   }
 
-    enrichedAppointments = enrichedAppointments.filter((item) =>
-      [
-        item.teacherUser?.name,
-        item.parentUser?.name,
-        item.organization?.name,
-        item.zonalAdmin?.name,
-        item.admin?.name,
-        item.status,
-        item.date,
-      ]
-        .filter(Boolean)
-        .some((value) =>
-          value.toLowerCase().includes(searchText)
-        )
-    );
-  }
+//   return {
+//     ...appointment,
 
-  // ================= SORT =================
-  if (sortBy) {
-    enrichedAppointments.sort((a, b) => {
-      let valueA;
-      let valueB;
+//     teacher,
+//     teacherUser,
 
-      switch (sortBy) {
-        case "teacherUser":
-          valueA = a.teacherUser?.name || "";
-          valueB = b.teacherUser?.name || "";
-          break;
+//     parent,
+//     parentUser,
 
-        case "parentUser":
-          valueA = a.parentUser?.name || "";
-          valueB = b.parentUser?.name || "";
-          break;
+//     // ================= CHILDREN =================
+//     childDetails,
 
-        case "organization":
-          valueA = a.organization?.name || "";
-          valueB = b.organization?.name || "";
-          break;
+//     organization,
+//     zonalAdmin,
+//     admin,
+//   };
+// };
 
-        case "zonalAdmin":
-          valueA = a.zonalAdmin?.name || "";
-          valueB = b.zonalAdmin?.name || "";
-          break;
-
-        case "admin":
-          valueA = a.admin?.name || "";
-          valueB = b.admin?.name || "";
-          break;
-
-        case "date":
-          valueA = new Date(a.date);
-          valueB = new Date(b.date);
-          break;
-
-        case "status":
-          valueA = a.status || "";
-          valueB = b.status || "";
-          break;
-
-        default:
-          return 0;
-      }
-
-      if (valueA < valueB) {
-        return sortOrder === "asc" ? -1 : 1;
-      }
-
-      if (valueA > valueB) {
-        return sortOrder === "asc" ? 1 : -1;
-      }
-
-      return 0;
-    });
-  }
-
-  return enrichedAppointments;
-};
-
-
-export const getAppointmentById = async (id) => {
-  const appointment = await Appointment.findById(id);
-  if (!appointment) {
-    const error = new Error("Appointment not found");
-    error.statusCode = 404;
-    throw error;
-  }
-  return appointment;
-};
-
-export const confirmAppointment = async (id) => {
+export const confirmAppointment = async (id, doneBy) => {
   const appointment = await Appointment.findById(id);
   if (!appointment) {
     const error = new Error("Appointment not found");
@@ -360,6 +773,7 @@ export const confirmAppointment = async (id) => {
     throw error;
   }
   appointment.status = "approved";
+  appointment.doneBy = doneBy;
   await appointment.save();
   return appointment;
 };
@@ -431,6 +845,8 @@ export const rescheduleAppointment = async (id, data) => {
   appointment.availabilityId = availability._id;
   appointment.zoomLink = availability.zoomLink;
   appointment.status = "rescheduled";
+  appointment.reason = data.reason || appointment.reason;
+  appointment.doneBy = doneBy;
 
   await appointment.save();
 
@@ -520,7 +936,7 @@ export const rescheduleAppointment = async (id, data) => {
   return appointment;
 };
 
-export const cancelAppointment = async (id) => {
+export const cancelAppointment = async (id , data) => {
   const appointment = await Appointment.findById(id);
   if (!appointment) {
     const error = new Error("Appointment not found");
@@ -528,6 +944,8 @@ export const cancelAppointment = async (id) => {
     throw error;
   }
   appointment.status = "cancelled";
+  appointment.reason = data.reason || appointment.reason;
+  appointment.doneBy = data.doneBy || appointment.doneBy;
   await appointment.save();
   await Availability.findOneAndUpdate(
     { userId: appointment.teacherId, date: appointment.date, time: appointment.time },
@@ -619,7 +1037,7 @@ export const cancelAppointment = async (id) => {
   return appointment;
 };
 
-export const completeAppointment = async (id) => {
+export const completeAppointment = async (id, doneBy) => {
   const appointment = await Appointment.findById(id);
   if (!appointment) {
     const error = new Error("Appointment not found");
@@ -627,6 +1045,7 @@ export const completeAppointment = async (id) => {
     throw error;
   }
   appointment.status = "completed";
+  appointment.doneBy = doneBy;
   await appointment.save();
 
   // Fetch Parent & Teacher Details
@@ -717,4 +1136,720 @@ export const completeAppointment = async (id) => {
 
 export const getAvailableSlots = async (doctorId) => {
   return await Availability.find({ userId: Number(doctorId), isBooked: false });
+};
+
+// export const appointmentsByIdService = async ({
+//   search = "",
+//   sortBy = "",
+//   sortOrder = "desc",
+//   parentId,
+// }) => {
+//   // const appointments = await Appointment.find().lean();
+//   const appointments = await Appointment.find({ parentId }).sort({ date: -1 }).sort({ time: -1 }).lean();
+
+//   let enrichedAppointments = await Promise.all(
+//     appointments.map(async (appointment) => {
+//       const [teacher, parent] = await Promise.all([
+//         Teacher.findOne({ userId: appointment.teacherId }).lean(),
+//         Parent.findOne({ userId: appointment.parentId }).lean(),
+//       ]);
+
+//       let teacherUser = null;
+//       let parentUser = null;
+//       let organization = null;
+//       let zonalAdmin = null;
+//       let admin = null;
+
+//       if (teacher) {
+//         teacherUser = await User.findOne({
+//           userId: teacher.userId,
+//         })
+//           .select("-password")
+//           .lean();
+//       }
+
+//       if (parent) {
+//         [
+//           parentUser,
+//           organization,
+//           zonalAdmin,
+//           admin,
+//         ] = await Promise.all([
+//           User.findOne({ userId: parent.userId })
+//             .select("-password")
+//             .lean(),
+
+//           User.findOne({ userId: parent.organizationId })
+//             .select("-password")
+//             .lean(),
+
+//           User.findOne({ userId: parent.zonalAdminId })
+//             .select("-password")
+//             .lean(),
+
+//           User.findOne({ userId: parent.adminId })
+//             .select("-password")
+//             .lean(),
+//         ]);
+//       }
+
+//       return {
+//         ...appointment,
+//         teacher,
+//         teacherUser,
+//         parent,
+//         parentUser,
+//         organization,
+//         zonalAdmin,
+//         admin,
+//       };
+//     })
+//   );
+
+//   // ================= SEARCH =================
+//   if (search?.trim()) {
+//     const searchText = search.toLowerCase();
+
+//     enrichedAppointments = enrichedAppointments.filter((item) =>
+//       [
+//         item.teacherUser?.name,
+//         item.parentUser?.name,
+//         item.organization?.name,
+//         item.zonalAdmin?.name,
+//         item.admin?.name,
+//         item.status,
+//         item.date,
+//       ]
+//         .filter(Boolean)
+//         .some((value) =>
+//           value.toLowerCase().includes(searchText)
+//         )
+//     );
+//   }
+
+//   // ================= SORT =================
+//   if (sortBy) {
+//     enrichedAppointments.sort((a, b) => {
+//       let valueA;
+//       let valueB;
+
+//       switch (sortBy) {
+//         case "teacherUser":
+//           valueA = a.teacherUser?.name || "";
+//           valueB = b.teacherUser?.name || "";
+//           break;
+
+//         case "parentUser":
+//           valueA = a.parentUser?.name || "";
+//           valueB = b.parentUser?.name || "";
+//           break;
+
+//         case "organization":
+//           valueA = a.organization?.name || "";
+//           valueB = b.organization?.name || "";
+//           break;
+
+//         case "zonalAdmin":
+//           valueA = a.zonalAdmin?.name || "";
+//           valueB = b.zonalAdmin?.name || "";
+//           break;
+
+//         case "admin":
+//           valueA = a.admin?.name || "";
+//           valueB = b.admin?.name || "";
+//           break;
+
+//         case "date":
+//           valueA = new Date(a.date);
+//           valueB = new Date(b.date);
+//           break;
+
+//         case "status":
+//           valueA = a.status || "";
+//           valueB = b.status || "";
+//           break;
+
+//         default:
+//           return 0;
+//       }
+
+//       if (valueA < valueB) {
+//         return sortOrder === "asc" ? -1 : 1;
+//       }
+
+//       if (valueA > valueB) {
+//         return sortOrder === "asc" ? 1 : -1;
+//       }
+
+//       return 0;
+//     });
+//   }
+
+//   return enrichedAppointments;
+// };
+
+export const getAppointmentsForParent = async ({
+  parentId,
+  search = "",
+  sortBy = "",
+  sortOrder = "asc",
+}) => {
+  const query = {};
+
+  // Filter appointments by parentId
+  if (parentId) {
+    query.parentId = parentId;
+  }
+
+  const appointments = await Appointment.find(query)
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const enrichedAppointments = await Promise.all(
+    appointments.map(async (appointment) => {
+      const [teacher, parent] = await Promise.all([
+        Teacher.findOne({ userId: appointment.teacherId }).lean(),
+        Parent.findOne({ userId: appointment.parentId }).lean(),
+      ]);
+
+      let teacherUser = null;
+      let parentUser = null;
+      let organization = null;
+      let zonalAdmin = null;
+      let admin = null;
+
+      if (teacher) {
+        teacherUser = await User.findOne({
+          userId: teacher.userId,
+        })
+          .select("-password")
+          .lean();
+      }
+
+      if (parent) {
+        [
+          parentUser,
+          organization,
+          zonalAdmin,
+          admin,
+        ] = await Promise.all([
+          User.findOne({ userId: parent.userId })
+            .select("-password")
+            .lean(),
+
+          User.findOne({ userId: parent.organizationId })
+            .select("-password")
+            .lean(),
+
+          User.findOne({ userId: parent.zonalAdminId })
+            .select("-password")
+            .lean(),
+
+          User.findOne({ userId: parent.adminId })
+            .select("-password")
+            .lean(),
+        ]);
+      }
+
+      return {
+        ...appointment,
+        teacher,
+        teacherUser,
+        parent,
+        parentUser,
+        organization,
+        zonalAdmin,
+        admin,
+      };
+    })
+  );
+
+  return enrichedAppointments;
+};
+
+// export const appointmentsByIdService = async ({
+//   search = "",
+//   sortBy = "",
+//   sortOrder = "desc",
+//   parentId,
+// }) => {
+//   const appointments = await Appointment.find({ parentId })
+//     .sort({ date: -1, time: -1 })
+//     .lean();
+
+//   let enrichedAppointments = await Promise.all(
+//     appointments.map(async (appointment) => {
+//       const [teacher, parent, availability] = await Promise.all([
+//         Teacher.findOne({
+//           userId: appointment.teacherId,
+//         }).lean(),
+
+//         Parent.findOne({
+//           userId: appointment.parentId,
+//         }).lean(),
+
+//         // Get Availability using appointment.teacherId
+//         Availability.findOne({
+//           userId: appointment.teacherId,
+//         }).lean(),
+//       ]);
+
+//       let teacherUser = null;
+//       let parentUser = null;
+//       let organization = null;
+//       let zonalAdmin = null;
+//       let admin = null;
+
+//       if (teacher) {
+//         teacherUser = await User.findOne({
+//           userId: teacher.userId,
+//         })
+//           .select("-password")
+//           .lean();
+//       }
+
+//       if (parent) {
+//         [
+//           parentUser,
+//           organization,
+//           zonalAdmin,
+//           admin,
+//         ] = await Promise.all([
+//           User.findOne({
+//             userId: parent.userId,
+//           })
+//             .select("-password")
+//             .lean(),
+
+//           User.findOne({
+//             userId: parent.organizationId,
+//           })
+//             .select("-password")
+//             .lean(),
+
+//           User.findOne({
+//             userId: parent.zonalAdminId,
+//           })
+//             .select("-password")
+//             .lean(),
+
+//           User.findOne({
+//             userId: parent.adminId,
+//           })
+//             .select("-password")
+//             .lean(),
+//         ]);
+//       }
+
+//       return {
+//         ...appointment,
+
+//         teacher,
+//         teacherUser,
+
+//         parent,
+//         parentUser,
+
+//         organization,
+//         zonalAdmin,
+//         admin,
+
+//         // Availability data for this teacher
+//         availability,
+//       };
+//     })
+//   );
+
+//   // ================= SEARCH =================
+//   if (search?.trim()) {
+//     const searchText = search.toLowerCase();
+
+//     enrichedAppointments = enrichedAppointments.filter((item) =>
+//       [
+//         item.teacherUser?.name,
+//         item.parentUser?.name,
+//         item.organization?.name,
+//         item.zonalAdmin?.name,
+//         item.admin?.name,
+//         item.status,
+//         item.date,
+//       ]
+//         .filter(Boolean)
+//         .some((value) =>
+//           String(value).toLowerCase().includes(searchText)
+//         )
+//     );
+//   }
+
+//   // ================= SORT =================
+//   if (sortBy) {
+//     enrichedAppointments.sort((a, b) => {
+//       let valueA;
+//       let valueB;
+
+//       switch (sortBy) {
+//         case "teacherUser":
+//           valueA = a.teacherUser?.name || "";
+//           valueB = b.teacherUser?.name || "";
+//           break;
+
+//         case "parentUser":
+//           valueA = a.parentUser?.name || "";
+//           valueB = b.parentUser?.name || "";
+//           break;
+
+//         case "organization":
+//           valueA = a.organization?.name || "";
+//           valueB = b.organization?.name || "";
+//           break;
+
+//         case "zonalAdmin":
+//           valueA = a.zonalAdmin?.name || "";
+//           valueB = b.zonalAdmin?.name || "";
+//           break;
+
+//         case "admin":
+//           valueA = a.admin?.name || "";
+//           valueB = b.admin?.name || "";
+//           break;
+
+//         case "date":
+//           valueA = new Date(a.date);
+//           valueB = new Date(b.date);
+//           break;
+
+//         case "status":
+//           valueA = a.status || "";
+//           valueB = b.status || "";
+//           break;
+
+//         default:
+//           return 0;
+//       }
+
+//       if (valueA < valueB) {
+//         return sortOrder === "asc" ? -1 : 1;
+//       }
+
+//       if (valueA > valueB) {
+//         return sortOrder === "asc" ? 1 : -1;
+//       }
+
+//       return 0;
+//     });
+//   }
+
+//   return enrichedAppointments;
+// };
+
+
+
+export const appointmentsByIdService = async ({
+  search = "",
+  sortBy = "",
+  sortOrder = "desc",
+  parentId,
+}) => {
+  const appointments = await Appointment.find({ parentId })
+    .sort({ date: -1, time: -1 })
+    .lean();
+
+  let enrichedAppointments = await Promise.all(
+    appointments.map(async (appointment) => {
+      const [teacher, parent, availability] = await Promise.all([
+        // ================= TEACHER =================
+        Teacher.findOne({
+          userId: appointment.teacherId,
+        }).lean(),
+
+        // ================= PARENT =================
+        Parent.findOne({
+          userId: appointment.parentId,
+        }).lean(),
+
+        // ================= AVAILABILITY =================
+        Availability.find({
+          userId: appointment.teacherId,
+        }).lean(),
+      ]);
+
+      let teacherUser = null;
+      let parentUser = null;
+      let organization = null;
+      let zonalAdmin = null;
+      let admin = null;
+
+      // ================= TEACHER USER =================
+      if (teacher) {
+        teacherUser = await User.findOne({
+          userId: teacher.userId,
+        })
+          .select("-password")
+          .lean();
+      }
+
+      // ================= PARENT =================
+      if (parent) {
+        [
+          parentUser,
+          organization,
+          zonalAdmin,
+          admin,
+        ] = await Promise.all([
+          User.findOne({
+            userId: parent.userId,
+          })
+            .select("-password")
+            .lean(),
+
+          User.findOne({
+            userId: parent.organizationId,
+          })
+            .select("-password")
+            .lean(),
+
+          User.findOne({
+            userId: parent.zonalAdminId,
+          })
+            .select("-password")
+            .lean(),
+
+          User.findOne({
+            userId: parent.adminId,
+          })
+            .select("-password")
+            .lean(),
+        ]);
+      }
+
+      return {
+        ...appointment,
+
+        teacher,
+        teacherUser,
+
+        parent,
+        parentUser,
+
+        organization,
+        zonalAdmin,
+        admin,
+
+        // ALL Availability records for this teacher
+        availability,
+      };
+    })
+  );
+
+  // ================= SEARCH =================
+  if (search?.trim()) {
+    const searchText = search.toLowerCase();
+
+    enrichedAppointments = enrichedAppointments.filter((item) =>
+      [
+        item.teacherUser?.name,
+        item.parentUser?.name,
+        item.organization?.name,
+        item.zonalAdmin?.name,
+        item.admin?.name,
+        item.status,
+        item.date,
+      ]
+        .filter(Boolean)
+        .some((value) =>
+          String(value).toLowerCase().includes(searchText)
+        )
+    );
+  }
+
+  // ================= SORT =================
+  if (sortBy) {
+    enrichedAppointments.sort((a, b) => {
+      let valueA;
+      let valueB;
+
+      switch (sortBy) {
+        case "teacherUser":
+          valueA = a.teacherUser?.name || "";
+          valueB = b.teacherUser?.name || "";
+          break;
+
+        case "parentUser":
+          valueA = a.parentUser?.name || "";
+          valueB = b.parentUser?.name || "";
+          break;
+
+        case "organization":
+          valueA = a.organization?.name || "";
+          valueB = b.organization?.name || "";
+          break;
+
+        case "zonalAdmin":
+          valueA = a.zonalAdmin?.name || "";
+          valueB = b.zonalAdmin?.name || "";
+          break;
+
+        case "admin":
+          valueA = a.admin?.name || "";
+          valueB = b.admin?.name || "";
+          break;
+
+        case "date":
+          valueA = new Date(a.date);
+          valueB = new Date(b.date);
+          break;
+
+        case "status":
+          valueA = a.status || "";
+          valueB = b.status || "";
+          break;
+
+        default:
+          return 0;
+      }
+
+      if (valueA < valueB) {
+        return sortOrder === "asc" ? -1 : 1;
+      }
+
+      if (valueA > valueB) {
+        return sortOrder === "asc" ? 1 : -1;
+      }
+
+      return 0;
+    });
+  }
+
+  return enrichedAppointments;
+};
+
+
+export const getAppointmentById = async (id) => {
+  const appointment = await Appointment.findById(id).lean();
+
+  if (!appointment) {
+    return null;
+  }
+
+  const [teacher, parent, childDetails, availability] = await Promise.all([
+    // ================= TEACHER =================
+    Teacher.findOne({
+      userId: appointment.teacherId,
+    }).lean(),
+
+    // ================= PARENT =================
+    Parent.findOne({
+      userId: appointment.parentId,
+    }).lean(),
+
+    // ================= CHILDREN =================
+    children
+      .find({
+        parentId: appointment.parentId,
+      })
+      .lean(),
+
+    // ================= AVAILABILITY =================
+    Availability.findById(appointment.availabilityId).lean(),
+  ]);
+
+  let teacherUser = null;
+  let parentUser = null;
+  let organization = null;
+  let zonalAdmin = null;
+  let admin = null;
+
+  // ================= TEACHER =================
+  if (teacher) {
+    teacherUser = await User.findOne({
+      userId: teacher.userId,
+    })
+      .select("-password")
+      .lean();
+  }
+
+  // ================= PARENT =================
+  if (parent) {
+    [
+      parentUser,
+      organization,
+      zonalAdmin,
+      admin,
+    ] = await Promise.all([
+      User.findOne({
+        userId: parent.userId,
+      })
+        .select("-password")
+        .lean(),
+
+      User.findOne({
+        userId: parent.organizationId,
+      })
+        .select("-password")
+        .lean(),
+
+      User.findOne({
+        userId: parent.zonalAdminId,
+      })
+        .select("-password")
+        .lean(),
+
+      User.findOne({
+        userId: parent.adminId,
+      })
+        .select("-password")
+        .lean(),
+    ]);
+  }
+
+  return {
+    ...appointment,
+
+    teacher,
+    teacherUser,
+
+    parent,
+    parentUser,
+
+    // ================= CHILDREN =================
+    childDetails,
+
+    // ================= AVAILABILITY =================
+    availability,
+
+    organization,
+    zonalAdmin,
+    admin,
+  };
+};
+
+
+
+export const updatePaymentStatus = async (id, data = {}) => {
+  const appointment = await Appointment.findById(id);
+
+  if (!appointment) {
+    const error = new Error("Appointment not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (data.paymentId !== undefined) {
+    appointment.paymentId = data.paymentId;
+  }
+
+  if (data.paymentStatus !== undefined) {
+    appointment.paymentStatus = data.paymentStatus;
+  }
+
+  if (data.status !== undefined) {
+    appointment.status = data.status;
+  } else if (data.paymentStatus === "completed") {
+    appointment.status = "approved";
+  } else if (data.paymentStatus === "pending") {
+    appointment.status = "pending";
+  }
+
+  await appointment.save();
+  return appointment;
 };

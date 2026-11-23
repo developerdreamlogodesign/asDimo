@@ -1,6 +1,10 @@
 import {
   registerUser,
   loginUser,
+  loginWithGoogle,
+  loginWithFacebook,
+  signupWithGoogle,
+  signupWithFacebook,
   getUserById,
   getAllUsersService,
   logoutUser,
@@ -12,15 +16,240 @@ import {
   validateOTP,
   resetPasswordWithOTP,
   getAllUsersServiceById,
+  getAllUsersByRelationService,
+  addChildInformationService,
+  saveQuestionAnswerService,
+  getQuestionAnswerService,
+  updateQuestionAnswerService,
+  updateUserRelationService,
+  authenticateWithGoogle,
+  getUsersByFlag2And4Service,
+  getTeachersAvailabilityByCityAndCategoryService,
+  getDistinctCitiesService,
+  getDistinctTherapistCategoriesService,
 } from "../services/auth.service.js";
+import {
+  sendEmailOtp,
+  validateEmailOtp,
+} from "../services/emailOtp.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import OrganizationAdmin from "../models/organizationAdmin.model.js";
 
+
+// export const register = asyncHandler(async (req, res) => {
+//   const {
+//     name,
+//     email,
+//     flag,
+//     referralCode,
+//     organizationId,
+//     organization_type,
+//     superAdminId,
+//     zonalAdminId,
+//     adminId,
+//     organizationAdminId,
+//     therapistId,
+//     teacherId,
+//     city,
+//     state,
+//     pincode,
+//     address,
+//     phone,
+//     country,
+//     org_name,
+//     therapist_category,
+//     yearsOfExperience,
+//     languages,
+//     cliniqueName,
+//     gender,
+//     fees,
+//     about_doctor,
+//   } = req.body;
+
+//   // console.log("BODY =>", req.body);
+//   // console.log("FILE =>", req.file);
+
+//   const profileImg = req.file
+//   ? `/uploads/profile/${req.file.filename}`
+//   : null;
+
+//   if (!name || !email || flag === undefined || flag === null) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "Please provide name, email, and flag",
+//     });
+//   }
+
+//   const numericFlag = Number(flag);
+
+//   const therapistCategories = [
+    
+//     "Psychologist",
+//     "speech therapist",
+//     "special educator",
+//     "operational therapist",
+//     "special package",
+//   ];
+
+//   if (
+//     [3, 5].includes(numericFlag) &&
+//     !therapistCategories.includes(therapist_category)
+//   ) {
+//     return res.status(400).json({
+//       success: false,
+//       message:
+//         "therapist_category is required for Therapist and Global Therapist and must be Psychologist, special package, speech therapist, special educator, or operational therapist",
+//     });
+//   }
+
+//   if (numericFlag === 6 && (!superAdminId || !city || !state || !pincode || !address)) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "superAdminId and full address are required for Zonal Admin",
+//     });
+//   }
+
+//   if (numericFlag === 7 && (!zonalAdminId || !city || !state || !pincode || !address)) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "zonalAdminId and full address are required for Admin",
+//     });
+//   }
+
+//   if (numericFlag === 1 && (!adminId || !city || !state || !pincode || !address)) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "adminId and full address are required for Organization Admin",
+//     });
+//   }
+
+//   if (numericFlag === 5 && !adminId) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "adminId is required for Global Therapist",
+//     });
+//   }
+
+//   // organization_type mandatory for OrganizationAdmin
+//   if (numericFlag === 1 && organization_type === undefined) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "organization_type is required for Organization Admin",
+//     });
+//   }
+
+//   // Validate organization_type value
+//   if (numericFlag === 1 && ![0, 1].includes(Number(organization_type))) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "organization_type must be 0 (Clinic) or 1 (School)",
+//     });
+//   }
+
+//   if (numericFlag === 3 && !organizationAdminId && !organizationId) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "organizationAdminId is required for Therapist",
+//     });
+//   }
+
+//   if (
+//     numericFlag === 2 &&
+//     !therapistId &&
+//     !teacherId &&
+//     !referralCode
+//   ) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "therapistId or referralCode is required for Parent",
+//     });
+//   }
+
+//   // const { user, generatedPassword, role } = await registerUser({
+//   //   name,
+//   //   email,
+//   //   flag,
+//   //   organizationId,
+//   //   organization_type,
+//   //   address
+//   // });
+
+//   let generatedOrgName = org_name;
+
+//   if (numericFlag === 5) {
+//     // First 3 letters of name
+//     const prefix = name
+//       .trim()
+//       .substring(0, 3)
+//       .toUpperCase();
+
+//     // Find last generated org_name
+//     const lastOrg = await OrganizationAdmin.findOne({
+//       org_name: { $regex: `^${prefix}_` },
+//     }).sort({ org_name: -1 });
+
+//     let nextNumber = 1;
+
+//     if (lastOrg) {
+//       const lastSequence = parseInt(lastOrg.org_name.split("_")[1]) || 0;
+//       nextNumber = lastSequence + 1;
+//     }
+
+//     generatedOrgName = `${prefix}_${String(nextNumber).padStart(3, "0")}`;
+//   }
+
+//   if (numericFlag === 1) {
+//     generatedOrgName = name;
+//   }
+
+//   const { user, generatedPassword, role } = await registerUser({
+//     name,
+//     email,
+//     flag,
+//     referralCode,
+//     organizationId,
+//     organization_type,
+//     address,
+//     phone,
+//     country,
+//     superAdminId,
+//     zonalAdminId,
+//     adminId,
+//     organizationAdminId,
+//     therapistId,
+//     teacherId,
+//     city,
+//     state,
+//     pincode,
+//     profileImg,
+//     org_name: generatedOrgName,
+//     therapist_category,
+//     yearsOfExperience,
+//     languages,
+//     cliniqueName,
+
+//     gender,
+//     fees,
+//     about_doctor,
+//   });
+
+//   res.status(201).json({
+//     success: true,
+//     message: "User registered successfully",
+//     data: {
+//       user,
+//       generatedPassword,
+//       role,
+//     },
+//   });
+// });
 
 export const register = asyncHandler(async (req, res) => {
   const {
     name,
     email,
     flag,
+    referralCode,
     organizationId,
     organization_type,
     superAdminId,
@@ -35,14 +264,21 @@ export const register = asyncHandler(async (req, res) => {
     address,
     phone,
     country,
+    org_name,
+    therapist_category,
+    specialization,
+    qualifications,
+    yearsOfExperience,
+    languages,
+    cliniqueName,
+    gender,
+    fees,
+    about_doctor,
   } = req.body;
 
-  // console.log("BODY =>", req.body);
-  // console.log("FILE =>", req.file);
-
   const profileImg = req.file
-  ? `/uploads/profile/${req.file.filename}`
-  : null;
+    ? `/uploads/profile/${req.file.filename}`
+    : null;
 
   if (!name || !email || flag === undefined || flag === null) {
     return res.status(400).json({
@@ -52,6 +288,25 @@ export const register = asyncHandler(async (req, res) => {
   }
 
   const numericFlag = Number(flag);
+
+  const therapistCategories = [
+    "Psychologist",
+    "speech therapist",
+    "special educator",
+    "operational therapist",
+    "special package",
+  ];
+
+  if (
+    [3, 5].includes(numericFlag) &&
+    !therapistCategories.includes(therapist_category)
+  ) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "therapist_category is required for Therapist and Global Therapist and must be Psychologist,special package, speech therapist, special educator, or operational therapist",
+    });
+  }
 
   if (numericFlag === 6 && (!superAdminId || !city || !state || !pincode || !address)) {
     return res.status(400).json({
@@ -74,7 +329,13 @@ export const register = asyncHandler(async (req, res) => {
     });
   }
 
-  // organization_type mandatory for OrganizationAdmin
+  if (numericFlag === 5 && !adminId) {
+    return res.status(400).json({
+      success: false,
+      message: "adminId is required for Global Therapist",
+    });
+  }
+
   if (numericFlag === 1 && organization_type === undefined) {
     return res.status(400).json({
       success: false,
@@ -82,7 +343,6 @@ export const register = asyncHandler(async (req, res) => {
     });
   }
 
-  // Validate organization_type value
   if (numericFlag === 1 && ![0, 1].includes(Number(organization_type))) {
     return res.status(400).json({
       success: false,
@@ -97,26 +357,49 @@ export const register = asyncHandler(async (req, res) => {
     });
   }
 
-  if (numericFlag === 2 && !therapistId && !teacherId) {
+  if (
+    numericFlag === 2 &&
+    !therapistId &&
+    !teacherId &&
+    !referralCode
+  ) {
     return res.status(400).json({
       success: false,
-      message: "therapistId is required for Parent",
+      message: "therapistId or referralCode is required for Parent",
     });
   }
 
-  // const { user, generatedPassword, role } = await registerUser({
-  //   name,
-  //   email,
-  //   flag,
-  //   organizationId,
-  //   organization_type,
-  //   address
-  // });
+  let generatedOrgName = org_name;
+
+  if (numericFlag === 5) {
+    const prefix = name
+      .trim()
+      .substring(0, 3)
+      .toUpperCase();
+
+    const lastOrg = await OrganizationAdmin.findOne({
+      org_name: { $regex: `^${prefix}_` },
+    }).sort({ org_name: -1 });
+
+    let nextNumber = 1;
+
+    if (lastOrg) {
+      const lastSequence = parseInt(lastOrg.org_name.split("_")[1]) || 0;
+      nextNumber = lastSequence + 1;
+    }
+
+    generatedOrgName = `${prefix}_${String(nextNumber).padStart(3, "0")}`;
+  }
+
+  if (numericFlag === 1) {
+    generatedOrgName = name;
+  }
 
   const { user, generatedPassword, role } = await registerUser({
     name,
     email,
     flag,
+    referralCode,
     organizationId,
     organization_type,
     address,
@@ -132,6 +415,16 @@ export const register = asyncHandler(async (req, res) => {
     state,
     pincode,
     profileImg,
+    org_name: generatedOrgName,
+    therapist_category,
+    specialization,
+    qualifications,
+    yearsOfExperience,
+    languages,
+    cliniqueName,
+    gender,
+    fees,
+    about_doctor,
   });
 
   res.status(201).json({
@@ -144,7 +437,6 @@ export const register = asyncHandler(async (req, res) => {
     },
   });
 });
-
 
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
@@ -166,6 +458,83 @@ export const login = asyncHandler(async (req, res) => {
       accessToken,
       refreshToken,
     },
+  });
+});
+
+export const googleLogin = asyncHandler(async (req, res) => {
+  const { idToken } = req.body || {};
+
+  if (typeof idToken !== "string" || !idToken.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: "Google ID token is required",
+    });
+  }
+
+  const { user, token, accessToken, refreshToken } = await loginWithGoogle(idToken.trim());
+
+  res.status(200).json({
+    success: true,
+    message: "Google login successful",
+    data: { user, token, accessToken, refreshToken },
+  });
+});
+
+export const facebookLogin = asyncHandler(async (req, res) => {
+  const { accessToken } = req.body || {};
+
+  if (typeof accessToken !== "string" || !accessToken.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: "Facebook access token is required",
+    });
+  }
+
+  const { user, token, accessToken: appAccessToken, refreshToken } =
+    await loginWithFacebook(accessToken.trim());
+
+  res.status(200).json({
+    success: true,
+    message: "Facebook login successful",
+    data: { user, token, accessToken: appAccessToken, refreshToken },
+  });
+});
+
+export const googleSignup = asyncHandler(async (req, res) => {
+  const { idToken, ...userData } = req.body || {};
+
+  if (!userData.flag && userData.flag !== 0) {
+    return res.status(400).json({
+      success: false,
+      message: "flag is required for social signup",
+    });
+  }
+
+  const result = await signupWithGoogle(idToken, userData);
+
+  res.status(201).json({
+    success: true,
+    message: "Google signup successful",
+    data: result,
+  });
+});
+
+export const facebookSignup = asyncHandler(async (req, res) => {
+  const { accessToken, ...userData } = req.body || {};
+
+  if (!userData.flag && userData.flag !== 0) {
+    return res.status(400).json({
+      success: false,
+      message: "flag is required for social signup",
+    });
+  }
+
+  const result = await signupWithFacebook(accessToken, userData);
+
+  res.status(201).json({
+    success: true,
+    message: "Facebook signup successful",
+    data: result,
   });
 });
 
@@ -215,6 +584,37 @@ export const getAllUsers = asyncHandler(async (req, res) => {
   }
 
   const users = await getAllUsersService(Number(flag), {
+    search,
+    sort,
+    sortBy,
+    sortOrder,
+  });
+
+  res.status(200).json({
+    success: true,
+    count: users.length,
+    data: users,
+  });
+});
+
+export const getAllUsersByRelation = asyncHandler(async (req, res) => {
+  const {
+    flag,
+    userId,
+    search,
+    sort,
+    sortBy,
+    sortOrder,
+  } = req.body;
+
+  if (flag === undefined || flag === null) {
+    return res.status(400).json({
+      success: false,
+      message: "Flag is required",
+    });
+  }
+
+  const users = await getAllUsersByRelationService(Number(flag), userId, {
     search,
     sort,
     sortBy,
@@ -517,5 +917,244 @@ export const getAllUsersById = asyncHandler(async (req, res) => {
     success: true,
     count: users.length,
     data: users,
+  });
+});
+
+// OTP flow for any valid email address. It uses in-memory storage only.
+export const sendOtpToEmail = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const result = await sendEmailOtp(email);
+
+  res.status(200).json({
+    success: true,
+    message: "OTP sent successfully",
+    data: result,
+  });
+});
+
+export const validateUnregisteredEmailOtp = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+  const result = validateEmailOtp(email, otp);
+
+  res.status(200).json({
+    success: true,
+    message: "OTP validated successfully",
+    data: { email: result.email, verified: true },
+  });
+});
+
+export const addChildInformation = asyncHandler(async (req, res) => {
+  const {
+    parentId,
+    childName,
+    childAge,
+    childGender,
+    grade,
+    familyType,
+    language,
+    dob,
+  } = req.body;
+
+  if (
+    parentId === undefined ||
+    !childName ||
+    childAge === undefined ||
+    !childGender ||
+    !grade ||
+    !familyType ||
+    !language
+  ) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "parentId, childName, childAge, childGender, grade, familyType, and language are required",
+    });
+  }
+
+  const child = await addChildInformationService(parentId, {
+    childName,
+    childAge,
+    childGender,
+    grade,
+    familyType,
+    language,
+    dob,
+  });
+
+  res.status(201).json({
+    success: true,
+    message: "Child information added successfully",
+    data: child,
+  });
+});
+
+export const saveQuestionAnswer = asyncHandler(async (req, res) => {
+  const personalize = await saveQuestionAnswerService(req.body);
+
+  res.status(200).json({
+    success: true,
+    message: "Question and answer saved successfully",
+    data: personalize,
+  });
+});
+
+export const getQuestionAnswer = asyncHandler(async (req, res) => {
+
+  const { parentId } = req.body;
+  const personalize = await getQuestionAnswerService(parentId);
+
+  res.status(200).json({
+    success: true,
+    message: "get data successfully",
+    data: personalize,
+  });
+});
+
+export const updateQuestionAnswer = asyncHandler(async (req, res) => {
+  const personalize = await updateQuestionAnswerService(req.body);
+
+  res.status(200).json({
+    success: true,
+    message: "Question and answer updated successfully",
+    data: personalize,
+  });
+});
+
+
+export const updateUserRelation = asyncHandler(async (req, res) => {
+  const {
+    flag,
+    userId,
+    updatedUserId,
+  } = req.body;
+
+  // console.log("flag in controller.....................",flag);
+  // console.log("userId in controller.....................",userId);
+  // console.log("updatedUserId in controller.....................",updatedUserId);
+
+  if (flag === undefined || flag === null) {
+    return res.status(400).json({
+      success: false,
+      message: "flag is required",
+    });
+  }
+
+  if (userId === undefined || userId === null) {
+    return res.status(400).json({
+      success: false,
+      message: "userId is required",
+    });
+  }
+
+  if (updatedUserId === undefined || updatedUserId === null) {
+    return res.status(400).json({
+      success: false,
+      message: "updatedUserId is required",
+    });
+  }
+
+  const result = await updateUserRelationService({
+    flag,
+    userId,
+    updatedUserId,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "User relation updated successfully",
+    data: result,
+  });
+});
+
+export const googleAuth = asyncHandler(async (req, res) => {
+  const { idToken, ...userData } = req.body || {};
+
+  if (typeof idToken !== "string" || !idToken.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: "Google ID token is required",
+    });
+  }
+
+  const result = await authenticateWithGoogle(
+    idToken.trim(),
+    userData
+  );
+
+  res.status(200).json({
+    success: true,
+    message: result.isNewUser
+      ? "Google registration and login successful"
+      : "Google login successful",
+    data: result,
+  });
+});
+
+
+export const getUsersByFlag2And4 = asyncHandler(async (req, res) => {
+  const { search, sort, sortBy, sortOrder } = {
+    ...(req.query || {}),
+    ...(req.body || {}),
+  };
+
+  const users = await getUsersByFlag2And4Service({
+    search,
+    sort,
+    sortBy,
+    sortOrder,
+  });
+
+  res.status(200).json({
+    success: true,
+    count: users.length,
+    data: users,
+  });
+});
+
+export const getTeachersAvailabilityByCityAndCategory = asyncHandler(
+  async (req, res) => {
+    const { city, therapist_category } = {
+      ...(req.query || {}),
+      ...(req.body || {}),
+    };
+
+    if (!city || !therapist_category) {
+      return res.status(400).json({
+        success: false,
+        message: "city and therapist_category are required",
+      });
+    }
+
+    const data = await getTeachersAvailabilityByCityAndCategoryService({
+      city,
+      therapist_category,
+    });
+
+    res.status(200).json({
+      success: true,
+      count: data.length,
+      data,
+    });
+  }
+);
+
+
+export const getDistinctCities = asyncHandler(async (req, res) => {
+  const cities = await getDistinctCitiesService();
+
+  res.status(200).json({
+    success: true,
+    count: cities.length,
+    data: cities,
+  });
+});
+
+export const getDistinctTherapistCategories = asyncHandler(async (req, res) => {
+  const categories = await getDistinctTherapistCategoriesService();
+
+  res.status(200).json({
+    success: true,
+    count: categories.length,
+    data: categories,
   });
 });

@@ -7,6 +7,10 @@ Base URL: `http://<host>:<port>/api`
 ### POST /auth/register
 Registers a new user.
 
+For Therapist (`flag: 3`) and Global Therapist (`flag: 5`) registrations,
+`therapist_category` is required and must be one of: `Psychologist`,
+`speech therapist`, `special educator`, or `operational therapist`.
+
 Request body:
 ```json
 {
@@ -71,6 +75,84 @@ Response:
 
 ---
 
+### POST /auth/google
+Sign in an existing AsDimo user with a Google ID token. The server validates the
+token signature and its audience before issuing the normal application access and
+refresh tokens.
+
+Request body:
+```json
+{
+  "idToken": "<google-id-token>"
+}
+```
+
+Response:
+```json
+{
+  "success": true,
+  "message": "Google login successful",
+  "data": {
+    "user": { "_id": "...", "userId": 123, "flag": 2, "email": "john@example.com" },
+    "token": "<jwt-access-token>",
+    "accessToken": "<jwt-access-token>",
+    "refreshToken": "<jwt-refresh-token>"
+  }
+}
+```
+
+Set `GOOGLE_CLIENT_IDS` in the backend `.env` to the comma-separated Google OAuth
+client ID(s) allowed to mint the frontend's ID token. For a mobile app this is
+normally the Web client ID supplied to the Google sign-in SDK.
+
+This endpoint signs in only users who already exist in AsDimo with the same,
+verified Google email address; it does not create a user or bypass inactive-user
+checks. On a successful login, it stores the verified Google subject, name,
+picture, and email in the matching user record.
+
+---
+
+### POST /auth/facebookLogin
+
+Sign in an existing AsDimo user with a Facebook user access token. The backend
+verifies that the token is valid and belongs to the configured Facebook app
+before issuing application tokens.
+
+Request body:
+```json
+{
+  "accessToken": "<facebook-user-access-token>"
+}
+```
+
+Response:
+```json
+{
+  "success": true,
+  "message": "Facebook login successful",
+  "data": {
+    "user": { "_id": "...", "userId": 123, "flag": 2, "email": "john@example.com" },
+    "token": "<jwt-access-token>",
+    "accessToken": "<jwt-access-token>",
+    "refreshToken": "<jwt-refresh-token>"
+  }
+}
+```
+
+Configure these backend `.env` variables (never expose the app secret to the
+frontend):
+```env
+FACEBOOK_APP_ID=your-facebook-app-id
+FACEBOOK_APP_SECRET=your-facebook-app-secret
+FACEBOOK_GRAPH_API_VERSION=v22.0
+```
+
+The Facebook login permission must include `email`. This endpoint only signs in
+an existing AsDimo user with the matching email and saves the verified Facebook
+ID, name, profile picture, and email in that user record.
+
+---
+
 ### POST /auth/logout
 Invalidate current JWT token.
 
@@ -126,6 +208,35 @@ Response:
   "message": "Password updated successfully"
 }
 ```
+---
+### POST /auth/googleSignup and POST /auth/facebookSignup
+
+Create a new AsDimo account from a verified Google ID token or Facebook user
+access token. The request must include `flag` and any role-specific fields
+required by `/auth/register` (for example, `therapistId` or `referralCode` for
+a parent). The provider token supplies the email and profile identity.
+
+Google request body:
+```json
+{
+  "idToken": "<google-id-token>",
+  "flag": 2,
+  "referralCode": "ABC123"
+}
+```
+
+Facebook request body:
+```json
+{
+  "accessToken": "<facebook-user-access-token>",
+  "flag": 2,
+  "therapistId": 123
+}
+```
+
+Both endpoints return `201` with the created user and the normal application
+`token`, `accessToken`, and `refreshToken`. They return `409` when an account
+already exists for the provider identity or verified email.
 
 ---
 
@@ -298,6 +409,32 @@ Response example:
 ---
 
 ## User Management
+
+### Get User Counts by Role
+
+**GET** `/dashboard/user-counts`
+
+Returns user totals from the `User` table. Parent includes flags `2` and `4`; Therapist includes flags `3` and `5`.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "User counts retrieved successfully",
+  "data": {
+    "totalUsers": 42,
+    "superAdmin": 1,
+    "organizationAdmin": 4,
+    "parent": 20,
+    "therapist": 10,
+    "zonalAdmin": 2,
+    "admin": 5
+  }
+}
+```
 
 ### POST /users
 Create a new user.
@@ -781,42 +918,109 @@ Response example:
 
 ---
 
-## Payment APIs
+## Payment APIs (Razorpay)
 
-### POST /payments/create-intent
-Create payment intent.
+### GET /payments/key
+Get the Razorpay public Key ID for client checkout.
+
+Response:
+```json
+{
+  "success": true,
+  "message": "Razorpay key retrieved successfully",
+  "data": {
+    "key": "rzp_test_..."
+  }
+}
+```
+
+### POST /payments/create-order
+Create a Razorpay order before opening the payment modal in React. Requires authentication.
 
 Request body example:
 ```json
 {
   "amount": 1999,
-  "currency": "INR"
+  "currency": "INR",
+  "receipt": "rcpt_12345",
+  "notes": {
+    "planName": "Premium Plan",
+    "userId": "67b9d5c8..."
+  }
 }
 ```
 
-### POST /payments/webhook
-Receive payment webhook events.
+Response:
+```json
+{
+  "success": true,
+  "message": "Razorpay order created successfully",
+  "data": {
+    "orderId": "order_P123456789",
+    "amount": 199900,
+    "amountInRupees": 1999,
+    "currency": "INR",
+    "receipt": "rcpt_12345",
+    "razorpayKeyId": "rzp_test_...",
+    "paymentDbId": "67b9d...",
+    "paymentId": 1
+  }
+}
+```
 
-Body depends on provider.
-
-### GET /payments
-List payments.
-
-### GET /payments/:id
-Get payment.
-
-### POST /payments/refund/:id
-Request refund.
+### POST /payments/verify-payment
+Verify the cryptographic signature returned by Razorpay Checkout in React. Requires authentication.
 
 Request body example:
 ```json
 {
-  "reason": "Customer request"
+  "razorpay_order_id": "order_P123456789",
+  "razorpay_payment_id": "pay_P987654321",
+  "razorpay_signature": "9ef28c8942b088b9177..."
+}
+```
+
+Response:
+```json
+{
+  "success": true,
+  "message": "Payment verified successfully",
+  "data": {
+    "verified": true,
+    "payment": {
+      "_id": "67b9d...",
+      "orderId": "order_P123456789",
+      "razorpayPaymentId": "pay_P987654321",
+      "amount": 1999,
+      "currency": "INR",
+      "status": "completed"
+    }
+  }
+}
+```
+
+### POST /payments/webhook
+Receive and process Razorpay webhook events (e.g. `payment.captured`, `payment.failed`, `refund.processed`).
+
+### GET /payments
+List all payments (supports `?status=completed` and `?userId=...` filters). Requires authentication.
+
+### GET /payments/:id
+Get payment details by MongoDB `_id`, auto-increment `paymentId`, or Razorpay `orderId`. Requires authentication.
+
+### POST /payments/refund/:id
+Process refund via Razorpay and update record. Requires authentication.
+
+Request body example:
+```json
+{
+  "amount": 1999,
+  "reason": "Customer cancellation"
 }
 ```
 
 ### GET /payments/reports
-Get payment reports.
+Get payment metrics and status breakdown. Requires authentication.
 
 ---
 

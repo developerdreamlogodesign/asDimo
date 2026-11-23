@@ -32,46 +32,75 @@ const authRouter = Router();
 // authRouter.post("/register",uploadProfile.single("profileImg"),authController.register);
 authRouter.post(
   "/register",
-  authenticate,
-  protect,
   uploadProfile.single("profileImg"),
   authController.register
 );
 authRouter.post("/login", authController.login);
+// authRouter.post("/googleLogin", authController.googleLogin);
+authRouter.post("/googleLogin", authController.googleAuth);
+authRouter.post("/facebookLogin", authController.facebookLogin);
+authRouter.post("/googleSignup", authController.googleSignup);
+authRouter.post("/facebookSignup", authController.facebookSignup);
 authRouter.post("/refresh-token", authController.refreshToken);
 authRouter.post("/logout", authenticate, protect, authController.logout);
 authRouter.post("/forgot-password", authController.forgotPassword);
 authRouter.post("/verify-email", authController.verifyEmail);
 authRouter.post("/validate-otp", authController.validateEmailOTP);
+authRouter.post("/send-email-otp", authController.sendOtpToEmail);
+authRouter.post("/validate-email-otp", authController.validateUnregisteredEmailOtp);
 authRouter.post("/reset-password", authController.resetPassword);
+authRouter.post("/add-child-information",authenticate,protect,authController.addChildInformation);
 authRouter.get("/profile", authenticate, protect, authController.getProfile);
 // authRouter.put("/profile", authenticate, protect, authController.updateProfile);
 authRouter.put("/updateProfile/:id",authenticate,protect,uploadProfile.single("profileImg"),authController.updateProfile);
 authRouter.put("/change-password", authenticate, protect, authController.changePassword);
 authRouter.post("/getAllUsers", authenticate, protect, authController.getAllUsers);
+authRouter.post("/getAllUsersByRelation", authenticate, protect, authController.getAllUsersByRelation);
 authRouter.post("/delete",authenticate,protect,authController.deleteUsersCon);
 authRouter.post("/getAllUsersById", authenticate, protect, authController.getAllUsersById);
+authRouter.post("/personalize", authenticate, protect, authController.saveQuestionAnswer);
+authRouter.post("/get-personalize", authenticate, protect, authController.getQuestionAnswer);
+authRouter.put("/updateUserRelation1",authenticate,protect,authController.updateUserRelation);
+authRouter.get("/getUsersByForParent", authenticate, protect, authController.getUsersByFlag2And4);
+authRouter.post("/getUsersByFlag2And4", authenticate, protect, authController.getUsersByFlag2And4);
+authRouter.post("/getTeachersAvailabilityByCityAndCategory", authenticate, protect, authController.getTeachersAvailabilityByCityAndCategory);
+authRouter.get("/getTeachersAvailabilityByCityAndCategory", authenticate, protect, authController.getTeachersAvailabilityByCityAndCategory);
+authRouter.get("/cities", authenticate, protect, authController.getDistinctCities);
+authRouter.post("/cities", authenticate, protect, authController.getDistinctCities);
+authRouter.get("/therapist-categories", authenticate, protect, authController.getDistinctTherapistCategories);
+authRouter.post("/therapist-categories", authenticate, protect, authController.getDistinctTherapistCategories);
+authRouter.post("/updateGlobalStatus", authenticate, protect, usersController.updateGlobalStatus);
+authRouter.put("/updateGlobalStatus", authenticate, protect, usersController.updateGlobalStatus);
+authRouter.patch("/updateGlobalStatus", authenticate, protect, usersController.updateGlobalStatus);
 router.use("/auth", authRouter);
 
 const therapistsRouter = Router();
 therapistsRouter.post("/availability", authenticate, protect, teacherController.addAvailabilityCon);
 therapistsRouter.get("/availability", authenticate, protect, teacherController.getAvailabilityWTCon);
+therapistsRouter.post("/get_availability", authenticate, protect, teacherController.getAvilabilitySlotsOfTherapist);
 therapistsRouter.patch("/appointments/status", authenticate, protect, teacherController.approveAppointmentCon);
 router.use("/therapists", therapistsRouter);
 
 const appointmentsRouter = Router();
 appointmentsRouter.post("/", authenticate, protect, appointmentsController.createAppointment);
 appointmentsRouter.get("/", authenticate, protect, appointmentsController.getAppointments);
+appointmentsRouter.post("/getAppointmentsById", authenticate, protect, appointmentsController.getAppointmentsById);
 appointmentsRouter.get("/:id", authenticate, protect, appointmentsController.getAppointmentById);
 appointmentsRouter.patch("/confirm/:id", authenticate, protect, appointmentsController.confirmAppointment);
 appointmentsRouter.patch("/reschedule/:id", authenticate, protect, appointmentsController.rescheduleAppointment);
 appointmentsRouter.patch("/cancel/:id", authenticate, protect, appointmentsController.cancelAppointment);
 appointmentsRouter.patch("/complete/:id", authenticate, protect, appointmentsController.completeAppointment);
 appointmentsRouter.get("/available-slots/:doctorId", authenticate, protect, appointmentsController.getAvailableSlots);
+appointmentsRouter.post("/getAppointmentsForParent",authenticate,protect,appointmentsController.getAppointmentsForParent);
+appointmentsRouter.patch("/updatePaymentStatus/:id", authenticate, protect, appointmentsController.updatePaymentStatus);
+appointmentsRouter.put("/updatePaymentStatus/:id", authenticate, protect, appointmentsController.updatePaymentStatus);
+appointmentsRouter.post("/updatePaymentStatus", authenticate, protect, appointmentsController.updatePaymentStatus);
+appointmentsRouter.patch("/payment-status/:id", authenticate, protect, appointmentsController.updatePaymentStatus);
 router.use("/appointments", appointmentsRouter);
 
 
 const dashboardRouter = Router();
+dashboardRouter.get("/user-counts", authenticate, protect, dashboardController.getUserCountsByFlag);
 dashboardRouter.get("/super-admin", authenticate, protect, dashboardController.getSuperAdminDashboard);
 dashboardRouter.get("/organization-admin", authenticate, protect, dashboardController.getOrganizationAdminDashboard);
 dashboardRouter.get("/parent", authenticate, protect, dashboardController.getParentDashboard);
@@ -98,6 +127,12 @@ usersRouter.get("/:id", authenticate, protect, usersController.getUserById);
 
 
 usersRouter.patch("/status/:id", authenticate, protect, usersController.updateUserStatus);
+usersRouter.post("/global-status", authenticate, protect, usersController.updateGlobalStatus);
+usersRouter.patch("/global-status", authenticate, protect, usersController.updateGlobalStatus);
+usersRouter.put("/global-status", authenticate, protect, usersController.updateGlobalStatus);
+usersRouter.post("/updateGlobalStatus", authenticate, protect, usersController.updateGlobalStatus);
+usersRouter.patch("/updateGlobalStatus", authenticate, protect, usersController.updateGlobalStatus);
+usersRouter.put("/updateGlobalStatus", authenticate, protect, usersController.updateGlobalStatus);
 usersRouter.delete("/:id", authenticate, protect, usersController.deleteUserById);
 usersRouter.patch("/role/:id", authenticate, protect, usersController.updateUserRole);
 router.use("/users", usersRouter);
@@ -147,7 +182,6 @@ questionsRouter.post("/recommendations", authenticate, protect, questionsControl
 router.use("/questions", questionsRouter);
 
 
-
 const gamesRouter = Router();
 gamesRouter.post("/", authenticate, protect, gamesController.createGame);
 gamesRouter.get("/", authenticate, protect, gamesController.getGames);
@@ -172,11 +206,14 @@ router.use("/subscriptions", subscriptionsRouter);
 
 const paymentsRouter = Router();
 
+paymentsRouter.get("/key", paymentsController.getRazorpayKey);
+paymentsRouter.post("/create-order", authenticate, protect, paymentsController.createRazorpayOrder);
+paymentsRouter.post("/verify-payment", authenticate, protect, paymentsController.verifyRazorpayPayment);
 paymentsRouter.post("/webhook", paymentsController.handlePaymentWebhook);
 paymentsRouter.get("/", authenticate, protect, paymentsController.getPayments);
+paymentsRouter.get("/reports", authenticate, protect, paymentsController.getPaymentReports);
 paymentsRouter.get("/:id", authenticate, protect, paymentsController.getPaymentById);
 paymentsRouter.post("/refund/:id", authenticate, protect, paymentsController.refundPayment);
-paymentsRouter.get("/reports", authenticate, protect, paymentsController.getPaymentReports);
 router.use("/payments", paymentsRouter);
 
 const analyticsRouter = Router();

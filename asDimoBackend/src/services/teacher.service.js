@@ -7,7 +7,7 @@ import { sendEmail } from "../utils/mailer.js";
 
 
 
-export const addAvailabilityservice = async (userId, date, time) => {
+export const addAvailabilityservice = async (userId, date, time, medium) => {
 
   const user = await User.findOne({ userId }).select("flag");
   const flag = user?.flag;
@@ -23,104 +23,260 @@ export const addAvailabilityservice = async (userId, date, time) => {
     throw new Error("This time slot already exists for this user");
   }
 
-  const zoomMeeting = await createZoomMeeting(date, time);
+  if(medium == "online"){
 
-  const availability = await Availability.create({
-    userId,
-    date,
-    time,
-    zoomLink: zoomMeeting.join_url,
-    zoomMeetingId: zoomMeeting.id,
-  });
+    const zoomMeeting = await createZoomMeeting(date, time);
+    const availability = await Availability.create({
+      userId,
+      date,
+      time,
+      zoomLink: zoomMeeting?.join_url || null,
+      zoomMeetingId: zoomMeeting?.id || null,
+      medium,
+    });
 
-  return availability;
+    return availability;
+
+  }else{
+    const availability = await Availability.create({
+      userId,
+      date,
+      time,
+      zoomLink: null,
+      zoomMeetingId: null,
+      medium,
+    });
+
+    return availability;
+  }
+
+
 };
+
+
+// export const getAvailabilityWTSer = async () => {
+//   const data = await Availability.aggregate([
+//     {
+//       $lookup: {
+//         from: "users", 
+//         localField: "userId",
+//         foreignField: "userId",
+//         as: "userDetails"
+//       }
+//     },
+//     {
+//       $unwind: {
+//         path: "$userDetails",
+//         preserveNullAndEmptyArrays: true
+//       }
+//     },
+//     {
+//       $lookup: {
+//         from: "teachers",
+//         localField: "userId",
+//         foreignField: "userId",
+//         as: "teacherDetails"
+//       }
+//     },
+//     {
+//       $unwind: {
+//         path: "$teacherDetails",
+//         preserveNullAndEmptyArrays: true
+//       }
+//     },
+//     {
+//       $lookup: {
+//         from: "organizationadmins",
+//         localField: "teacherDetails.organizationId",
+//         foreignField: "organizationId",
+//         as: "organizationDetails"
+//       }
+//     },
+//     {
+//       $unwind: {
+//         path: "$organizationDetails",
+//         preserveNullAndEmptyArrays: true
+//       }
+//     },
+//     {
+//       $addFields: {
+//         isGlobalTeacher: {
+//           $cond: [
+//             { $eq: ["$teacherDetails.organizationId", null] },
+//             true,
+//             false
+//           ]
+//         }
+//       }
+//     },
+//     {
+//       $project: {
+//         __v : 0,
+//         _id : 0,
+//         createdAt : 0,
+//         updatedAt : 0,
+//         "userDetails._id": 0, 
+//         "userDetails.password": 0, 
+//         "userDetails.__v": 0,
+//         "userDetails.createdAt": 0,
+//         "userDetails.updatedAt": 0,
+
+//         "teacherDetails._id": 0,
+//         "teacherDetails.__v": 0,
+//         "teacherDetails.createdAt": 0,
+//         "teacherDetails.updatedAt": 0,
+
+//         "organizationDetails._id": 0,
+//         "organizationDetails.__v": 0,
+//         "organizationDetails.createdAt": 0,
+//         "organizationDetails.updatedAt": 0
+//       }
+//     }
+//   ]);
+
+//   return data;
+// };
 
 
 export const getAvailabilityWTSer = async () => {
   const data = await Availability.aggregate([
+    // =====================================================
+    // GET AVAILABILITY USER DETAILS
+    // =====================================================
     {
       $lookup: {
-        from: "users", 
+        from: "users",
         localField: "userId",
         foreignField: "userId",
-        as: "userDetails"
-      }
+        as: "userDetails",
+      },
     },
+
     {
       $unwind: {
         path: "$userDetails",
-        preserveNullAndEmptyArrays: true
-      }
+        preserveNullAndEmptyArrays: true,
+      },
     },
+
+    // =====================================================
+    // GET TEACHER DETAILS
+    // =====================================================
     {
       $lookup: {
         from: "teachers",
         localField: "userId",
         foreignField: "userId",
-        as: "teacherDetails"
-      }
+        as: "teacherDetails",
+      },
     },
+
     {
       $unwind: {
         path: "$teacherDetails",
-        preserveNullAndEmptyArrays: true
-      }
+        preserveNullAndEmptyArrays: true,
+      },
     },
+
+    // =====================================================
+    // GET TEACHER USER DETAILS
+    // teacherDetails.teacherId == users.userId
+    // =====================================================
+    {
+      $lookup: {
+        from: "users",
+        localField: "teacherDetails.teacherId",
+        foreignField: "userId",
+        as: "teacherUserDetails",
+      },
+    },
+
+    {
+      $unwind: {
+        path: "$teacherUserDetails",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+
+    // =====================================================
+    // GET ORGANIZATION DETAILS
+    // =====================================================
     {
       $lookup: {
         from: "organizationadmins",
         localField: "teacherDetails.organizationId",
         foreignField: "organizationId",
-        as: "organizationDetails"
-      }
+        as: "organizationDetails",
+      },
     },
+
     {
       $unwind: {
         path: "$organizationDetails",
-        preserveNullAndEmptyArrays: true
-      }
+        preserveNullAndEmptyArrays: true,
+      },
     },
+
+    // =====================================================
+    // GLOBAL TEACHER
+    // =====================================================
     {
       $addFields: {
         isGlobalTeacher: {
           $cond: [
-            { $eq: ["$teacherDetails.organizationId", null] },
+            {
+              $eq: ["$teacherDetails.organizationId", null],
+            },
             true,
-            false
-          ]
-        }
-      }
+            false,
+          ],
+        },
+      },
     },
+
+    // =====================================================
+    // REMOVE UNWANTED FIELDS
+    // =====================================================
     {
       $project: {
-        __v : 0,
-        _id : 0,
-        createdAt : 0,
-        updatedAt : 0,
-        "userDetails._id": 0, 
-        "userDetails.password": 0, 
+        __v: 0,
+        _id: 0,
+        createdAt: 0,
+        updatedAt: 0,
+
+        // Availability user
+        "userDetails._id": 0,
+        "userDetails.password": 0,
         "userDetails.__v": 0,
         "userDetails.createdAt": 0,
         "userDetails.updatedAt": 0,
 
+        // Teacher
         "teacherDetails._id": 0,
         "teacherDetails.__v": 0,
         "teacherDetails.createdAt": 0,
         "teacherDetails.updatedAt": 0,
 
+        // Teacher's User
+        "teacherUserDetails._id": 0,
+        "teacherUserDetails.password": 0,
+        "teacherUserDetails.__v": 0,
+        "teacherUserDetails.createdAt": 0,
+        "teacherUserDetails.updatedAt": 0,
+
+        // Organization
         "organizationDetails._id": 0,
         "organizationDetails.__v": 0,
         "organizationDetails.createdAt": 0,
-        "organizationDetails.updatedAt": 0
-      }
-    }
+        "organizationDetails.updatedAt": 0,
+      },
+    },
   ]);
 
   return data;
 };
 
-export const approveAppointmentSer = async (appointmentId, status) => {
+export const approveAppointmentSer = async (appointmentId, status ,doneBy) => {
 
   const allowedStatus = ["approved", "rejected"];
 
@@ -134,9 +290,9 @@ export const approveAppointmentSer = async (appointmentId, status) => {
     throw new Error("Appointment not found");
   }
 
-  if (appointment.status !== "pending") {
-    throw new Error("Only pending appointments can be updated");
-  }
+  // if (appointment.status !== "pending") {
+  //   throw new Error("Only pending appointments can be updated");
+  // }
 
   if (status === "approved") {
 
@@ -152,6 +308,7 @@ export const approveAppointmentSer = async (appointmentId, status) => {
     }
 
     appointment.status = "approved";
+    appointment.doneBy = doneBy;
     await appointment.save();
 
     const availability = await Availability.findOne({
@@ -171,6 +328,7 @@ export const approveAppointmentSer = async (appointmentId, status) => {
         date: appointment.date,
         time: appointment.time,
         status: "pending",
+        doneBy: { $ne: doneBy },
         _id: { $ne: appointmentId },
       },
       { status: "rejected" }
@@ -179,8 +337,15 @@ export const approveAppointmentSer = async (appointmentId, status) => {
 
   if (status === "rejected") {
     appointment.status = "rejected";
+    appointment.doneBy = doneBy;
     await appointment.save();
   }
 
   return appointment;
+};
+
+
+export const getAvailabilitySlotsService = async (therapistId) => {
+  const therapist = await Availability.find({ userId: therapistId }).lean();
+  return therapist;
 };

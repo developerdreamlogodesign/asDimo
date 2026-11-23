@@ -1,23 +1,12 @@
 import app from "./src/app.js";
-
 import connectDB from "./src/config/db.js";
-
 import { env } from "./src/config/env.js";
-
-
 
 connectDB();
 
+const PORT = 6002;
+const HOST = "127.0.0.1";
 
-const PORT = process.env.PORT || 4000;
-
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+app.listen(PORT, HOST, () => {
+  console.log(`🚀 Server running on http://${HOST}:${PORT}`);
 });
-
-
-// app.listen(env.PORT, () => {
-
-//   console.log(`🚀 Server running on port ${env.PORT}`);
-
-// });

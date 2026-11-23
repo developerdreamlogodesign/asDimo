@@ -2,13 +2,36 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import * as appointmentsService from "../services/appointments.service.js";
 
 export const createAppointment = asyncHandler(async (req, res) => {
-    const {teacherId , date , time , parentId } = req.body;
 
-  if (!teacherId || !date || !time || !parentId) {
+  const body = req.body;
+  if (Array.isArray(body)) {
+    if (body.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide at least one appointment",
+      });
+    }
+    for (const item of body) {
+      if (!(item.teacherId || item.doctorId) || !item.date || !item.time || !item.parentId) {
+        return res.status(400).json({
+          success: false,
+          message: "Please provide all required fields: teacherId, date, time, parentId",
+        });
+      }
+    }
+  } else {
+    const { teacherId, doctorId, date, time, parentId, slots, appointments, schedules } = body || {};
+    const slotList = slots || appointments || schedules;
+    const hasSlotList = Array.isArray(slotList) && slotList.length > 0;
+    const hasDateAndTime =
+      (Array.isArray(date) ? date.length > 0 : Boolean(date)) &&
+      (Array.isArray(time) ? time.length > 0 : Boolean(time));
+    if (!(teacherId || doctorId) || !parentId || (!hasDateAndTime && !hasSlotList)) {
     return res.status(400).json({
       success: false,
-      message: "Please provide all required fields: teacherId, date, time, parentId",
+      message: "Please provide all required fields: teacherId, date, time, parentId, paymentId",
     });
+  }
   }
   const appointment = await appointmentsService.createAppointment(req.body);
   res.status(201).json({
@@ -28,12 +51,22 @@ export const createAppointment = asyncHandler(async (req, res) => {
 // });
 
 export const getAppointments = asyncHandler(async (req, res) => {
-  const { search = "", sortBy = "", sortOrder = "asc" } = req.query;
+  const {
+    search = "",
+    sortBy = "",
+    sortOrder = "asc",
+    status,
+    medium,
+    teacherId,
+  } = req.query;
 
   const appointments = await appointmentsService.getAppointments({
     search,
     sortBy,
     sortOrder,
+    status,
+    medium,
+    teacherId,
   });
 
   res.status(200).json({
@@ -53,7 +86,8 @@ export const getAppointmentById = asyncHandler(async (req, res) => {
 });
 
 export const confirmAppointment = asyncHandler(async (req, res) => {
-  const appointment = await appointmentsService.confirmAppointment(req.params.id);
+  const { doneBy } = req.body;
+  const appointment = await appointmentsService.confirmAppointment(req.params.id,doneBy);
   res.status(200).json({
     success: true,
     message: "Appointment confirmed successfully",
@@ -62,12 +96,12 @@ export const confirmAppointment = asyncHandler(async (req, res) => {
 });
 
 export const rescheduleAppointment = asyncHandler(async (req, res) => {
-  const {date , time } = req.body;
+  const {date , time , reason , doneBy } = req.body;
 
-  if (!date || !time) {
+  if (!date || !time || !reason) {
     return res.status(400).json({
       success: false,
-      message: "Please provide all required fields: date, time",
+      message: "Please provide all required fields: date, time, reason",
     });
   }
   const appointment = await appointmentsService.rescheduleAppointment(req.params.id, req.body);
@@ -79,7 +113,16 @@ export const rescheduleAppointment = asyncHandler(async (req, res) => {
 });
 
 export const cancelAppointment = asyncHandler(async (req, res) => {
-  const appointment = await appointmentsService.cancelAppointment(req.params.id);
+  const {reason , doneBy } = req.body;
+
+    if (!reason) {
+    return res.status(400).json({
+      success: false,
+      message: "Please provide all required fields: reason",
+    });
+  }
+
+  const appointment = await appointmentsService.cancelAppointment(req.params.id , req.body);
   res.status(200).json({
     success: true,
     message: "Appointment cancelled successfully",
@@ -88,7 +131,8 @@ export const cancelAppointment = asyncHandler(async (req, res) => {
 });
 
 export const completeAppointment = asyncHandler(async (req, res) => {
-  const appointment = await appointmentsService.completeAppointment(req.params.id);
+  const { doneBy } = req.body;
+  const appointment = await appointmentsService.completeAppointment(req.params.id, doneBy);
   res.status(200).json({
     success: true,
     message: "Appointment completed successfully",
@@ -102,5 +146,92 @@ export const getAvailableSlots = asyncHandler(async (req, res) => {
     success: true,
     message: "Available slots retrieved successfully",
     data: slots,
+  });
+});
+
+// export const getAppointmentsById = asyncHandler(async (req, res) => {
+//   const { search = "", sortBy = "", sortOrder = "asc" } = req.query;
+//   const { parentId } = req.body;
+
+//   const appointments = await appointmentsService.appointmentsByIdService({
+//     search,
+//     sortBy,
+//     sortOrder,
+//     parentId,
+//   });
+
+//   res.status(200).json({
+//     success: true,
+//     message: "Appointments retrieved successfully",
+//     data: appointments,
+//   });
+// });
+
+export const getAppointmentsForParent = asyncHandler(async (req, res) => {
+  const {
+    parentId,
+    search = "",
+    sortBy = "",
+    sortOrder = "asc",
+  } = req.body;
+
+  const appointments = await appointmentsService.getAppointmentsForParent({
+    parentId,
+    search,
+    sortBy,
+    sortOrder,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Appointments retrieved successfully",
+    data: appointments,
+  });
+});
+
+export const getAppointmentsById = asyncHandler(async (req, res) => {
+  const { search = "", sortBy = "", sortOrder = "asc" } = req.query;
+  const { parentId } = req.body;
+
+  const appointments =
+    await appointmentsService.appointmentsByIdService({
+      search,
+      sortBy,
+      sortOrder,
+      parentId,
+    });
+
+  res.status(200).json({
+    success: true,
+    message: "Appointments retrieved successfully",
+    data: appointments,
+  });
+});
+
+
+
+
+
+export const updatePaymentStatus = asyncHandler(async (req, res) => {
+  const id = req.params.id || req.body.id || req.body.appointmentId;
+  const { paymentStatus, status, paymentId } = req.body;
+
+  if (!id) {
+    return res.status(400).json({
+      success: false,
+      message: "Appointment id is required",
+    });
+  }
+
+  const appointment = await appointmentsService.updatePaymentStatus(id, {
+    paymentStatus,
+    status,
+    paymentId,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Payment status updated successfully",
+    data: appointment,
   });
 });

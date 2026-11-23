@@ -38,8 +38,33 @@ const appoinmentSchema = new mongoose.Schema(
         enum: ["pending", "approved", "rejected", "cancelled" , "rescheduled" , "completed"],
         default: "pending",
       },
+
+      reason: {
+        type: String,
+        default: "payment done",
+      },
+
+      paymentId: {
+        type: String,
+        required: false,
+      },
+
+      amount: {
+        type: Number,
+        required: false,
+      },
+
+      paymentStatus: {
+        type: String,
+        required: false,
+      },
   
       zoomLink: String,
+      doneBy: {
+        type: String,
+        enum: ["parent", "teacher" , "admin" , "superadmin" , "zonaladmin" , "organizationadmin"],
+        default: "parent",
+      },
     },
     { timestamps: true }
   );

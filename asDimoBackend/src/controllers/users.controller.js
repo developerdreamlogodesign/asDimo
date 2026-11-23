@@ -63,3 +63,17 @@ export const updateUserRole = asyncHandler(async (req, res) => {
     data: user,
   });
 });
+
+export const updateGlobalStatus = asyncHandler(async (req, res) => {
+  const { userId, globalStatus } = req.body;
+  const result = await usersService.updateGlobalStatus({
+    userId: userId ?? req.params.id,
+    globalStatus,
+  });
+  res.status(200).json({
+    success: true,
+    message: "Global status updated successfully",
+    data: result,
+  });
+});
+

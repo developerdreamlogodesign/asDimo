@@ -22,6 +22,11 @@ if (!process.env.JWT_SECRET) {
   throw new Error("JWT_SECRET is missing in .env");
 }
 
+const googleClientIds = (process.env.GOOGLE_CLIENT_IDS || "")
+  .split(",")
+  .map((clientId) => clientId.trim())
+  .filter(Boolean);
+
 export const env = {
   PORT: process.env.PORT || 5000,
   MONGO_URI: process.env.MONGO_URI,
@@ -29,4 +34,12 @@ export const env = {
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "15m",
   JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
   JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || "7d",
+  GOOGLE_CLIENT_IDS: googleClientIds,
+  FACEBOOK_APP_ID: process.env.FACEBOOK_APP_ID || "",
+  FACEBOOK_APP_SECRET: process.env.FACEBOOK_APP_SECRET || "",
+  FACEBOOK_GRAPH_API_VERSION: process.env.FACEBOOK_GRAPH_API_VERSION || "v22.0",
+  RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID || "",
+  RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET || "",
+  RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET || "",
 };
+

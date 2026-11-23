@@ -5,9 +5,15 @@ import SuperAdmin from "../models/superAdmin.model.js";
 import OrganizationAdmin from "../models/organizationAdmin.model.js";
 import BlacklistLog from "../models/blacklistLog.model.js";
 import ZonalAdmin from "../models/zonalAdmin.model.js";
+import Child from "../models/child.model.js";
 import Admin from "../models/admin.model.js";
 import RefreshToken from "../models/refreshToken.model.js";
+import Personalize from "../models/personalize.model.js";
+import Appointment from "../models/appoinment.model.js";
+import Availability from "../models/avialability.model.js";
 import mongoose from "mongoose";
+import { OAuth2Client } from "google-auth-library";
+import axios from "axios";
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -16,6 +22,7 @@ import {
 import { sendEmail } from "../utils/sendEmail.js";
 // import { generateSessionId } from "../utils/session.js";
 import { sendNotification } from "./notifications.service.js";
+import { env } from "../config/env.js";
 
 
 const generateRandomPassword = (length = 8) => {
@@ -43,6 +50,25 @@ const createRefreshTokenRecord = async (userId, userObjectId) => {
   });
 
   return refreshToken;
+};
+
+const issueSocialAuthTokens = async (user, registration) => {
+  const accessToken = generateAccessToken(user._id.toString());
+  const refreshToken = await createRefreshTokenRecord(user._id.toString(), user._id);
+  user.lastLogin = new Date();
+  await user.save();
+
+  const userObject = user.toObject();
+  delete userObject.password;
+
+  return {
+    user: userObject,
+    token: accessToken,
+    accessToken,
+    refreshToken,
+    generatedPassword: registration.generatedPassword,
+    role: registration.role,
+  };
 };
 
 const toPositiveNumber = (value, fieldName) => {
@@ -90,8 +116,12 @@ const getRoleParents = async (flag, userData) => {
     parents.zonalAdmin = zonalAdmin;
   }
 
-  if (flag === 1) {
-    requireField(userData.adminId, "adminId", "Organization Admin");
+  if (flag === 1 || flag === 5) {
+    requireField(
+      userData.adminId,
+      "adminId",
+      flag === 5 ? "Global Therapist" : "Organization Admin"
+    );
     const adminId = toPositiveNumber(userData.adminId, "adminId");
     const admin = await Admin.findOne({ adminId });
     if (!admin) {
@@ -153,8 +183,17 @@ const getRoleParents = async (flag, userData) => {
   return parents;
 };
 
-const generateReferralCode = (length = 6) => {
+const generateReferralCode = (name, length = 6) => {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+  // Get first 3 letters from name
+  const prefix = name
+    .trim()
+    .replace(/[^a-zA-Z]/g, "")
+    .substring(0, 3)
+    .toUpperCase()
+    .padEnd(3, "X");
+
   let code = "";
 
   for (let i = 0; i < length; i++) {
@@ -163,13 +202,600 @@ const generateReferralCode = (length = 6) => {
     );
   }
 
-  return code;
+  return `${prefix}${code}`;
 };
+
+// const generateReferralCode = (length = 6) => {
+//   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+//   let code = "";
+
+//   for (let i = 0; i < length; i++) {
+//     code += chars.charAt(
+//       Math.floor(Math.random() * chars.length)
+//     );
+//   }
+
+//   return code;
+// };
+
+/////////////////////
+// export const registerUser = async (userData) => {
+
+//   // return userData;
+//   // Check if user already exists
+//   const existingUser = await User.findOne({ email: userData.email });
+//   if (existingUser) {
+//     const error = new Error("User with this email already exists");
+//     error.statusCode = 400;
+//     throw error;
+//   }
+
+//   let referralCode;
+//   let exists;
+
+//   do {
+//     // referralCode = generateReferralCode(6);
+//       referralCode = generateReferralCode(userData.name, 6);
+
+//     exists = await User.findOne({
+//       referralCode,
+//     });
+//   } while (exists);
+
+//   try {
+//     const generatedPassword = generateRandomPassword();
+
+//     const flag = Number(userData.flag);
+
+//     // If referralCode provided for Parent (flag === 2), map referring user to required parent fields
+//     if (flag === 2 && userData.referralCode) {
+//       const refUser = await User.findOne({ referralCode: userData.referralCode });
+//       if (!refUser) {
+//         const error = new Error("Invalid referralCode: user not found");
+//         error.statusCode = 404;
+//         throw error;
+//       }
+
+//       const refFlag = Number(refUser.flag);
+
+//       // If referring user is an Organization Admin, attach organizationAdminId and organizationId
+//       if (refFlag === 1) {
+//         userData.organizationAdminId = refUser.userId;
+//         userData.organizationId = refUser.userId;
+//       }
+
+//       // If referring user is a Teacher or special OrganizationAdmin (flag 3 or 5), treat as therapist/teacher
+//       if (refFlag === 3 || refFlag === 5) {
+//         userData.therapistId = refUser.userId;
+//         userData.teacherId = refUser.userId;
+
+//         // Try to resolve organization admin info to derive adminId / zonalAdminId
+//         let orgAdmin = null;
+
+//         if (refFlag === 3) {
+//           const teacherDoc = await Teacher.findOne({ teacherId: refUser.userId });
+//           if (teacherDoc) {
+//             const orgLookup = [];
+//             if (teacherDoc.organizationAdminId !== undefined && teacherDoc.organizationAdminId !== null) {
+//               orgLookup.push({ organizationAdminId: teacherDoc.organizationAdminId });
+//             }
+//             if (teacherDoc.organizationId !== undefined && teacherDoc.organizationId !== null) {
+//               orgLookup.push({ organizationId: teacherDoc.organizationId });
+//             }
+//             if (orgLookup.length) {
+//               orgAdmin = await OrganizationAdmin.findOne({ $or: orgLookup });
+//             }
+//             // If teacherDoc itself has admin/zonal info, prefer that
+//             if (!orgAdmin) {
+//               if (teacherDoc.adminId || teacherDoc.zonalAdminId) {
+//                 orgAdmin = {
+//                   adminId: teacherDoc.adminId ?? null,
+//                   zonalAdminId: teacherDoc.zonalAdminId ?? null,
+//                   organizationAdminId: teacherDoc.organizationAdminId ?? null,
+//                   organizationId: teacherDoc.organizationId ?? null,
+//                 };
+//               }
+//             }
+//           }
+//         } else if (refFlag === 5) {
+//           orgAdmin = await OrganizationAdmin.findOne({
+//             $or: [{ organizationAdminId: refUser.userId }, { organizationId: refUser.userId }],
+//           });
+//         }
+
+//         if (orgAdmin) {
+//           userData.adminId = orgAdmin.adminId ?? userData.adminId;
+//           userData.zonalAdminId = orgAdmin.zonalAdminId ?? userData.zonalAdminId;
+//           userData.organizationAdminId = orgAdmin.organizationAdminId ?? orgAdmin.organizationId ?? userData.organizationAdminId;
+//           userData.organizationId = orgAdmin.organizationId ?? userData.organizationId;
+//         }
+//       }
+//     }
+
+
+//     if (flag === 1) {
+//       requireField(userData.organization_type, "organization_type", "Organization Admin");
+//       if (![0, 1].includes(Number(userData.organization_type))) {
+//         const error = new Error("organization_type must be 0 (Clinic) or 1 (School)");
+//         error.statusCode = 400;
+//         throw error;
+//       }
+//     }
+
+//     const parents = await getRoleParents(flag, userData);
+
+//     // Use transaction when available; fallback to manual rollback if transactions are not supported
+//     const session = await mongoose.startSession();
+//     let user;
+//     let roleDoc;
+
+//     try {
+//       await session.withTransaction(async () => {
+//         user = await User.create(
+//           [
+//             {
+//               name: userData.name,
+//               email: userData.email,
+//               flag,
+//               password: generatedPassword,
+//               referralCode,
+//               status: 1,
+//               city : userData.city,
+//               state : userData.state,
+//               pincode : userData.pincode,
+//               address : userData.address,
+//               phone : userData.phone,
+//               country : userData.country,
+//               profileImg: userData.profileImg,
+//               org_name: userData.org_name,
+//             },
+//           ],
+//           { session }
+//         );
+//         user = user[0];
+//         // user = await User.findById(user._id);
+//         user = await User.findById(user._id).session(session);
+//         // await user.save({ session });
+//         // console.log("Created user:", {
+//         //   _id: user._id,
+//         //   userId: user.userId,
+//         // });
+
+//         // Create role-specific "table"
+//         if (flag === 0) {
+//           roleDoc = await SuperAdmin.create(
+//             [
+//               {
+//                 adminId: user.userId,
+//                 userId: user.userId,
+//                 user: user._id,
+//               },
+//             ],
+//             { session }
+//           );
+//           roleDoc = roleDoc[0];
+//         } else if (flag === 1) {
+//           roleDoc = await OrganizationAdmin.create(
+//             [
+//               {
+//                 organizationAdminId: user.userId,
+//                 userId: user.userId,
+//                 user: user._id,
+//                 // for OrganizationAdmin, organizationId is this same user's userId
+//                 organizationId: user.userId,
+//                 adminId: parents.admin.adminId,
+//                 organization_type: Number(userData.organization_type),
+//                 zonalAdminId: parents.admin.zonalAdminId,
+//                 city : userData.city,
+//                 state : userData.state,
+//                 pincode : userData.pincode,
+//                 address : userData.address,
+//                 country : userData.country,
+//                 phone : userData.phone,
+//               },
+//             ],
+//             { session }
+//           );
+//           roleDoc = roleDoc[0];
+//         } else if (flag === 2 || flag === 4) {
+//           roleDoc = await Parent.create(
+//             [
+//               {
+//                 parentId: user.userId,
+//                 userId: user.userId,
+//                 user: user._id,
+//                 organizationId: flag === 2 ? parents.therapist.organizationId : null,
+//                 organizationAdminId:
+//                   flag === 2 ? parents.therapist.organizationAdminId : null,
+//                 zonalAdminId:
+//                   flag === 2
+//                     ? parents.therapist.zonalAdminId ??
+//                       parents.organizationAdmin?.zonalAdminId
+//                     : null,
+//                 adminId:
+//                   flag === 2
+//                     ? parents.therapist.adminId ?? parents.organizationAdmin?.adminId
+//                     : null,
+//                 therapistId: flag === 2 ? parents.therapist.teacherId : null,
+//                 teacherId: flag === 2 ? parents.therapist.teacherId : null,
+//               },
+//             ],
+//             { session }
+//           );
+//           roleDoc = roleDoc[0];
+//         } else if (flag === 3) {
+//           roleDoc = await Teacher.create(
+//             [
+//               {
+//                 teacherId: user.userId,
+//                 userId: user.userId,
+//                 user: user._id,
+//                 organizationId: parents.organizationAdmin.organizationId,
+//                 organizationAdminId: parents.organizationAdmin.organizationAdminId,
+//                 zonalAdminId: parents.organizationAdmin.zonalAdminId,
+//                 adminId: parents.organizationAdmin.adminId,
+//                 therapist_category: userData.therapist_category,
+//                 yearsOfExperience: userData.yearsOfExperience,
+//                 languages: userData.languages,
+//                 cliniqueName: userData.cliniqueName,
+//                 gender: userData.gender,
+//                 fees: userData.fees,
+//                 about_doctor: userData.about_doctor,
+//               },
+//             ],
+//             { session }
+//           );
+//           roleDoc = roleDoc[0];
+//         } else if (flag === 5) {
+//           // A global therapist is also its own organization.  Use the newly
+//           // created user's numeric ID for both organization identifiers, then
+//           // use those exact values on the therapist record.
+//           const organizationAdmin = await OrganizationAdmin.create(
+//             [
+//               {
+//                 organizationAdminId: user.userId,
+//                 organizationId: user.userId,
+//                 userId: user.userId,
+//                 user: user._id,
+//                 zonalAdminId: parents.admin.zonalAdminId,
+//                 adminId: parents.admin.adminId,
+//                 organization_type: userData.organization_type ?? null,
+//                 city : userData.city,
+//                 state : userData.state,
+//                 pincode : userData.pincode,
+//                 address : userData.address,
+//                 country : userData.country,
+//                 phone : userData.phone,
+//               },
+//             ],
+//             { session }
+//           );
+
+//           roleDoc = await Teacher.create(
+//             [
+//               {
+//                 teacherId: user.userId,
+//                 userId: user.userId,
+//                 user: user._id,
+//                 organizationId: organizationAdmin[0].organizationId,
+//                 organizationAdminId: organizationAdmin[0].organizationAdminId,
+//                 zonalAdminId: organizationAdmin[0].zonalAdminId,
+//                 adminId: organizationAdmin[0].adminId,
+//                 therapist_category: userData.therapist_category,
+//                 yearsOfExperience: userData.yearsOfExperience,
+//                 languages: userData.languages,
+//                 cliniqueName: userData.cliniqueName,
+//                 gender: userData.gender,
+//                 fees: userData.fees,
+//                 about_doctor: userData.about_doctor,
+//               },
+//             ],
+//             { session }
+//           );
+//           roleDoc = roleDoc[0];
+//         } else if (flag === 6) {
+//           roleDoc = await ZonalAdmin.create(
+//             [
+//               {
+//                 zonalAdminId: user.userId,
+//                 userId: user.userId,
+//                 user: user._id,
+//                 superAdminId: userData.superAdminId,
+//                 // superAdminId: parents.superAdmin.adminId,
+//                 city : userData.city,
+//                 state : userData.state,
+//                 pincode : userData.pincode,
+//                 address : userData.address,
+//                 phone : userData.phone,
+//                 country : userData.country,
+//               },
+//             ],
+//             { session }
+//           );
+//           roleDoc = roleDoc[0];
+//         } else if (flag === 7) {
+//           roleDoc = await Admin.create(
+//             [
+//               {
+//                 adminId: user.userId,
+//                 userId: user.userId,
+//                 user: user._id,
+//                 zonalAdminId: parents.zonalAdmin.zonalAdminId,
+//                 city: userData.city,
+//                 state: userData.state,
+//                 pincode: userData.pincode,
+//                 address: userData.address,
+//                 phone: userData.phone,
+//                 country: userData.country,
+//                 status: 1,
+//               },
+//             ],
+//             { session }
+//           );
+//           roleDoc = roleDoc[0];
+//         } else {
+//           const error = new Error("Invalid flag value");
+//           error.statusCode = 400;
+//           throw error;
+//         }
+//       });
+//     } catch (txErr) {
+//       // If transactions are not supported (e.g., standalone Mongo), do a best-effort rollback flow
+//       if (
+//         typeof txErr?.message === "string" &&
+//         (txErr.message.includes("Transaction") ||
+//           txErr.message.includes("replica set") ||
+//           txErr.message.includes("not supported"))
+//       ) {
+//         // Create user first
+//         user = await User.create({
+//           name: userData.name,
+//           email: userData.email,
+//           flag,
+//           password: generatedPassword,
+//           status: 1,
+//           city : userData.city,
+//           state : userData.state,
+//           pincode : userData.pincode,
+//           address : userData.address,
+//           phone : userData.phone,
+//           country : userData.country,
+//         });
+
+//         try {
+//           if (flag === 0) {
+//             roleDoc = await SuperAdmin.create({
+//               adminId: user.userId,
+//               userId: user.userId,
+//               user: user._id,
+//             });
+//           } else if (flag === 1) {
+//             roleDoc = await OrganizationAdmin.create({
+//               organizationAdminId: user.userId,
+//               userId: user.userId,
+//               user: user._id,
+//               organizationId: user.userId,
+//               adminId: parents.admin.adminId,
+//               organization_type: Number(userData.organization_type),
+//               zonalAdminId: parents.admin.zonalAdminId,
+//               city : userData.city,
+//               state : userData.state,
+//               pincode : userData.pincode,
+//               address : userData.address,
+//               phone : userData.phone,
+//               country : userData.country,
+//             });
+//           }else if (flag === 2 || flag === 4) {
+//             roleDoc = await Parent.create({
+//               parentId: user.userId,
+//               userId: user.userId,
+//               user: user._id,
+//               organizationId: flag === 2 ? parents.therapist.organizationId : null,
+//               organizationAdminId:
+//                 flag === 2 ? parents.therapist.organizationAdminId : null,
+//               zonalAdminId:
+//                 flag === 2
+//                   ? parents.therapist.zonalAdminId ??
+//                     parents.organizationAdmin?.zonalAdminId
+//                   : null,
+//               adminId:
+//                 flag === 2
+//                   ? parents.therapist.adminId ?? parents.organizationAdmin?.adminId
+//                   : null,
+//               therapistId: flag === 2 ? parents.therapist.teacherId : null,
+//               teacherId: flag === 2 ? parents.therapist.teacherId : null,
+//             });
+//           } else if (flag === 3) {
+//             roleDoc = await Teacher.create({
+//               teacherId: user.userId,
+//               userId: user.userId,
+//               user: user._id,
+//               organizationId: flag === 3 ? parents.organizationAdmin.organizationId : null,
+//               organizationAdminId: flag === 3 ? parents.organizationAdmin.organizationAdminId : null,
+//               zonalAdminId: flag === 3 ? parents.organizationAdmin.zonalAdminId : null,
+//               adminId: flag === 3 ? parents.organizationAdmin.adminId : null,
+//               therapist_category: userData.therapist_category,
+//               yearsOfExperience: userData.yearsOfExperience,
+//               languages: userData.languages,
+//               cliniqueName: userData.cliniqueName,
+//               gender: userData.gender,
+//               fees: userData.fees,
+//               about_doctor: userData.about_doctor,
+//             });
+//           } else if (flag === 5) {
+//             const organizationAdmin = await OrganizationAdmin.create({
+//               organizationAdminId: user.userId,
+//               organizationId: user.userId,
+//               userId: user.userId,
+//               user: user._id,
+//               zonalAdminId: parents.admin.zonalAdminId,
+//               adminId: parents.admin.adminId,
+//               organization_type: userData.organization_type ?? null,
+//               city: userData.city,
+//               state: userData.state,
+//               pincode: userData.pincode,
+//               address: userData.address,
+//               country: userData.country,
+//               phone: userData.phone,
+//             });
+
+//             roleDoc = await Teacher.create(
+//               {
+//                 teacherId: user.userId,
+//                 userId: user.userId,
+//                 user: user._id,
+//                 organizationId: organizationAdmin.organizationId,
+//                 organizationAdminId: organizationAdmin.organizationAdminId,
+//                 zonalAdminId: organizationAdmin.zonalAdminId,
+//                 adminId: organizationAdmin.adminId,
+//                 therapist_category: userData.therapist_category,
+//                 yearsOfExperience: userData.yearsOfExperience,
+//                 languages: userData.languages,
+//                 cliniqueName: userData.cliniqueName,
+//                 gender: userData.gender,
+//                 fees: userData.fees,
+//                 about_doctor: userData.about_doctor,
+//               }
+//             );
+//         } else if (flag === 6) {
+//             roleDoc = await ZonalAdmin.create({
+//                   zonalAdminId: user.userId,
+//                   userId: user.userId,
+//                   user: user._id,
+//                   superAdminId: parents.superAdmin.adminId,
+//                   city : userData.city,
+//                   state : userData.state,
+//                   pincode : userData.pincode,
+//                   address : userData.address,
+//                   phone : userData.phone,
+//                   country : userData.country,
+//                 });
+//           } else if (flag === 7) {
+//             roleDoc = await Admin.create({
+//               adminId: user.userId,
+//               userId: user.userId,
+//               user: user._id,
+//               zonalAdminId: parents.zonalAdmin.zonalAdminId,
+//               city: userData.city,
+//               state: userData.state,
+//               pincode: userData.pincode,
+//               address: userData.address,
+//               phone: userData.phone,
+//               country: userData.country,
+//               status: 1,
+//             });
+//           } else {
+//             const error = new Error("Invalid flag value");
+//             error.statusCode = 400;
+//             throw error;
+//           }
+//         } catch (roleErr) {
+//             // Remove role documents created before the failure
+//           if (flag === 5) {
+//             await OrganizationAdmin.deleteOne({
+//               userId: user.userId,
+//             });
+
+//             await Teacher.deleteOne({
+//               userId: user.userId,
+//             });
+//           }
+
+//           // Remove User
+//           await User.deleteOne({
+//             _id: user._id,
+//           });
+
+//           throw roleErr;
+//         }
+//       } else {
+//         throw txErr;
+//       }
+//     } finally {
+//       session.endSession();
+//     }
+
+//     await sendEmail(
+//       userData.email,
+//       "Your Account Credentials",
+//       `
+//         <h2>Welcome ${userData.name}</h2>
+//         <p>Your account has been created successfully.</p>
+//         <p><strong>Email:</strong> ${userData.email}</p>
+//         <p><strong>Password:</strong> ${generatedPassword}</p>
+//         <p>Please login and change your password.</p>
+//       `
+//     );
+
+//     await sendNotification({
+//       userId: user.userId,
+//       title: "Registration Successful",
+//       message: `Welcome ${user.name}! Your account has been created successfully.`,
+//       metadata: {
+//         userId: user.userId,
+//         email: user.email,
+//         flag: user.flag,
+//         role: roleDoc?.constructor?.modelName || null,
+//       },
+//     });
+
+//     // Return user without password, plus the generated password separately
+//     const userObject = user.toObject();
+//     delete userObject.password;
+//     return {
+//       user: userObject,
+//       generatedPassword,
+//       role: roleDoc
+//         ? { collection: roleDoc.constructor?.modelName, _id: roleDoc._id }
+//         : null,
+//     };
+//   } catch (error) {
+//     // Handle Mongoose validation errors
+//     if (error.name === "ValidationError") {
+//       error.statusCode = 400;
+//     }
+//     throw error;
+//   }
+// };
+
+// export const loginUser = async (email, password) => {
+//   // Find user and include password
+//   const user = await User.findOne({ email }).select("+password");
+
+//   if (!user) {
+//     const error = new Error("Invalid email or password");
+//     error.statusCode = 401;
+//     throw error;
+//   }
+
+//   //  CHECK STATUS FIRST
+//   if (user.status !== 1) {
+//     const error = new Error("Your account is inactive. Please contact admin.");
+//     error.statusCode = 403;
+//     throw error;
+//   }
+
+//   // Compare password
+//   const isPasswordValid = await user.comparePassword(password);
+
+//   if (!isPasswordValid) {
+//     const error = new Error("Invalid email or password");
+//     error.statusCode = 401;
+//     throw error;
+//   }
+
+//   const token = generateAccessToken(user._id.toString());
+//   const refreshToken = await createRefreshTokenRecord(user._id.toString(), user._id);
+
+//   // Remove password
+//   const userObject = user.toObject();
+//   delete userObject.password;
+
+//   return { user: userObject, token, accessToken: token, refreshToken };
+// };
 
 
 export const registerUser = async (userData) => {
-
-  // return userData;
   // Check if user already exists
   const existingUser = await User.findOne({ email: userData.email });
   if (existingUser) {
@@ -182,7 +808,7 @@ export const registerUser = async (userData) => {
   let exists;
 
   do {
-    referralCode = generateReferralCode(6);
+    referralCode = generateReferralCode(userData.name, 6);
 
     exists = await User.findOne({
       referralCode,
@@ -194,6 +820,70 @@ export const registerUser = async (userData) => {
 
     const flag = Number(userData.flag);
 
+    // If referralCode provided for Parent (flag === 2), map referring user to required parent fields
+    if (flag === 2 && userData.referralCode) {
+      const refUser = await User.findOne({ referralCode: userData.referralCode });
+      if (!refUser) {
+        const error = new Error("Invalid referralCode: user not found");
+        error.statusCode = 404;
+        throw error;
+      }
+
+      const refFlag = Number(refUser.flag);
+
+      // If referring user is an Organization Admin, attach organizationAdminId and organizationId
+      if (refFlag === 1) {
+        userData.organizationAdminId = refUser.userId;
+        userData.organizationId = refUser.userId;
+      }
+
+      // If referring user is a Teacher or special OrganizationAdmin (flag 3 or 5), treat as therapist/teacher
+      if (refFlag === 3 || refFlag === 5) {
+        userData.therapistId = refUser.userId;
+        userData.teacherId = refUser.userId;
+
+        // Try to resolve organization admin info to derive adminId / zonalAdminId
+        let orgAdmin = null;
+
+        if (refFlag === 3) {
+          const teacherDoc = await Teacher.findOne({ teacherId: refUser.userId });
+          if (teacherDoc) {
+            const orgLookup = [];
+            if (teacherDoc.organizationAdminId !== undefined && teacherDoc.organizationAdminId !== null) {
+              orgLookup.push({ organizationAdminId: teacherDoc.organizationAdminId });
+            }
+            if (teacherDoc.organizationId !== undefined && teacherDoc.organizationId !== null) {
+              orgLookup.push({ organizationId: teacherDoc.organizationId });
+            }
+            if (orgLookup.length) {
+              orgAdmin = await OrganizationAdmin.findOne({ $or: orgLookup });
+            }
+            // If teacherDoc itself has admin/zonal info, prefer that
+            if (!orgAdmin) {
+              if (teacherDoc.adminId || teacherDoc.zonalAdminId) {
+                orgAdmin = {
+                  adminId: teacherDoc.adminId ?? null,
+                  zonalAdminId: teacherDoc.zonalAdminId ?? null,
+                  organizationAdminId: teacherDoc.organizationAdminId ?? null,
+                  organizationId: teacherDoc.organizationId ?? null,
+                };
+              }
+            }
+          }
+        } else if (refFlag === 5) {
+          orgAdmin = await OrganizationAdmin.findOne({
+            $or: [{ organizationAdminId: refUser.userId }, { organizationId: refUser.userId }],
+          });
+        }
+
+        if (orgAdmin) {
+          userData.adminId = orgAdmin.adminId ?? userData.adminId;
+          userData.zonalAdminId = orgAdmin.zonalAdminId ?? userData.zonalAdminId;
+          userData.organizationAdminId = orgAdmin.organizationAdminId ?? orgAdmin.organizationId ?? userData.organizationAdminId;
+          userData.organizationId = orgAdmin.organizationId ?? userData.organizationId;
+        }
+      }
+    }
 
     if (flag === 1) {
       requireField(userData.organization_type, "organization_type", "Organization Admin");
@@ -205,6 +895,32 @@ export const registerUser = async (userData) => {
     }
 
     const parents = await getRoleParents(flag, userData);
+
+    const toStringArray = (val) =>
+      Array.isArray(val)
+        ? val.map((v) => String(v).trim()).filter(Boolean)
+        : typeof val === "string" && val.trim()
+        ? val.split(",").map((v) => v.trim()).filter(Boolean)
+        : [];
+
+    const teacherFields = {
+      therapist_category: userData.therapist_category,
+      phone: userData.phone ?? null,
+      specialization: toStringArray(userData.specialization ?? userData.therapist_category),
+      qualifications: toStringArray(userData.qualifications ?? userData.qualification),
+      yearsOfExperience:
+        userData.yearsOfExperience !== undefined && userData.yearsOfExperience !== ""
+          ? Number(userData.yearsOfExperience)
+          : 0,
+      languages: toStringArray(userData.languages),
+      cliniqueName: userData.cliniqueName || null,
+      gender: userData.gender || null,
+      fees:
+        userData.fees !== undefined && userData.fees !== ""
+          ? Number(userData.fees)
+          : 0,
+      about_doctor: userData.about_doctor ?? userData.about ?? null,
+    };
 
     // Use transaction when available; fallback to manual rollback if transactions are not supported
     const session = await mongoose.startSession();
@@ -222,25 +938,20 @@ export const registerUser = async (userData) => {
               password: generatedPassword,
               referralCode,
               status: 1,
-              city : userData.city,
-              state : userData.state,
-              pincode : userData.pincode,
-              address : userData.address,
-              phone : userData.phone,
-              country : userData.country,
+              city: userData.city,
+              state: userData.state,
+              pincode: userData.pincode,
+              address: userData.address,
+              phone: userData.phone,
+              country: userData.country,
               profileImg: userData.profileImg,
+              org_name: userData.org_name,
             },
           ],
           { session }
         );
         user = user[0];
-        // user = await User.findById(user._id);
         user = await User.findById(user._id).session(session);
-        // await user.save({ session });
-        // console.log("Created user:", {
-        //   _id: user._id,
-        //   userId: user.userId,
-        // });
 
         // Create role-specific "table"
         if (flag === 0) {
@@ -262,17 +973,16 @@ export const registerUser = async (userData) => {
                 organizationAdminId: user.userId,
                 userId: user.userId,
                 user: user._id,
-                // for OrganizationAdmin, organizationId is this same user's userId
                 organizationId: user.userId,
                 adminId: parents.admin.adminId,
                 organization_type: Number(userData.organization_type),
                 zonalAdminId: parents.admin.zonalAdminId,
-                city : userData.city,
-                state : userData.state,
-                pincode : userData.pincode,
-                address : userData.address,
-                country : userData.country,
-                phone : userData.phone,
+                city: userData.city,
+                state: userData.state,
+                pincode: userData.pincode,
+                address: userData.address,
+                country: userData.country,
+                phone: userData.phone,
               },
             ],
             { session }
@@ -304,17 +1014,59 @@ export const registerUser = async (userData) => {
             { session }
           );
           roleDoc = roleDoc[0];
-        } else if (flag === 3 || flag === 5) {
+        } else if (flag === 3) {
           roleDoc = await Teacher.create(
             [
               {
                 teacherId: user.userId,
                 userId: user.userId,
                 user: user._id,
-                organizationId: flag === 3 ? parents.organizationAdmin.organizationId : null,
-                organizationAdminId: flag === 3 ? parents.organizationAdmin.organizationAdminId : null,
-                zonalAdminId: flag === 3 ? parents.organizationAdmin.zonalAdminId : null,
-                adminId: flag === 3 ? parents.organizationAdmin.adminId : null,
+                organizationId: parents.organizationAdmin.organizationId,
+                organizationAdminId: parents.organizationAdmin.organizationAdminId,
+                zonalAdminId: parents.organizationAdmin.zonalAdminId,
+                adminId: parents.organizationAdmin.adminId,
+                ...teacherFields,
+              },
+            ],
+            { session }
+          );
+          roleDoc = roleDoc[0];
+        } else if (flag === 5) {
+          // A global therapist is also its own organization. Use the newly
+          // created user's numeric ID for both organization identifiers, then
+          // use those exact values on the therapist record.
+          const organizationAdmin = await OrganizationAdmin.create(
+            [
+              {
+                organizationAdminId: user.userId,
+                organizationId: user.userId,
+                userId: user.userId,
+                user: user._id,
+                zonalAdminId: parents.admin.zonalAdminId,
+                adminId: parents.admin.adminId,
+                organization_type: userData.organization_type ?? null,
+                city: userData.city,
+                state: userData.state,
+                pincode: userData.pincode,
+                address: userData.address,
+                country: userData.country,
+                phone: userData.phone,
+              },
+            ],
+            { session }
+          );
+
+          roleDoc = await Teacher.create(
+            [
+              {
+                teacherId: user.userId,
+                userId: user.userId,
+                user: user._id,
+                organizationId: organizationAdmin[0].organizationId,
+                organizationAdminId: organizationAdmin[0].organizationAdminId,
+                zonalAdminId: organizationAdmin[0].zonalAdminId,
+                adminId: organizationAdmin[0].adminId,
+                ...teacherFields,
               },
             ],
             { session }
@@ -328,13 +1080,12 @@ export const registerUser = async (userData) => {
                 userId: user.userId,
                 user: user._id,
                 superAdminId: userData.superAdminId,
-                // superAdminId: parents.superAdmin.adminId,
-                city : userData.city,
-                state : userData.state,
-                pincode : userData.pincode,
-                address : userData.address,
-                phone : userData.phone,
-                country : userData.country,
+                city: userData.city,
+                state: userData.state,
+                pincode: userData.pincode,
+                address: userData.address,
+                phone: userData.phone,
+                country: userData.country,
               },
             ],
             { session }
@@ -380,13 +1131,16 @@ export const registerUser = async (userData) => {
           email: userData.email,
           flag,
           password: generatedPassword,
+          referralCode,
           status: 1,
-          city : userData.city,
-          state : userData.state,
-          pincode : userData.pincode,
-          address : userData.address,
-          phone : userData.phone,
-          country : userData.country,
+          city: userData.city,
+          state: userData.state,
+          pincode: userData.pincode,
+          address: userData.address,
+          phone: userData.phone,
+          country: userData.country,
+          profileImg: userData.profileImg,
+          org_name: userData.org_name,
         });
 
         try {
@@ -405,14 +1159,14 @@ export const registerUser = async (userData) => {
               adminId: parents.admin.adminId,
               organization_type: Number(userData.organization_type),
               zonalAdminId: parents.admin.zonalAdminId,
-              city : userData.city,
-              state : userData.state,
-              pincode : userData.pincode,
-              address : userData.address,
-              phone : userData.phone,
-              country : userData.country,
+              city: userData.city,
+              state: userData.state,
+              pincode: userData.pincode,
+              address: userData.address,
+              phone: userData.phone,
+              country: userData.country,
             });
-          }else if (flag === 2 || flag === 4) {
+          } else if (flag === 2 || flag === 4) {
             roleDoc = await Parent.create({
               parentId: user.userId,
               userId: user.userId,
@@ -432,7 +1186,7 @@ export const registerUser = async (userData) => {
               therapistId: flag === 2 ? parents.therapist.teacherId : null,
               teacherId: flag === 2 ? parents.therapist.teacherId : null,
             });
-          } else if (flag === 3 || flag === 5) {
+          } else if (flag === 3) {
             roleDoc = await Teacher.create({
               teacherId: user.userId,
               userId: user.userId,
@@ -441,20 +1195,48 @@ export const registerUser = async (userData) => {
               organizationAdminId: flag === 3 ? parents.organizationAdmin.organizationAdminId : null,
               zonalAdminId: flag === 3 ? parents.organizationAdmin.zonalAdminId : null,
               adminId: flag === 3 ? parents.organizationAdmin.adminId : null,
+              ...teacherFields,
+            });
+          } else if (flag === 5) {
+            const organizationAdmin = await OrganizationAdmin.create({
+              organizationAdminId: user.userId,
+              organizationId: user.userId,
+              userId: user.userId,
+              user: user._id,
+              zonalAdminId: parents.admin.zonalAdminId,
+              adminId: parents.admin.adminId,
+              organization_type: userData.organization_type ?? null,
+              city: userData.city,
+              state: userData.state,
+              pincode: userData.pincode,
+              address: userData.address,
+              country: userData.country,
+              phone: userData.phone,
+            });
+
+            roleDoc = await Teacher.create({
+              teacherId: user.userId,
+              userId: user.userId,
+              user: user._id,
+              organizationId: organizationAdmin.organizationId,
+              organizationAdminId: organizationAdmin.organizationAdminId,
+              zonalAdminId: organizationAdmin.zonalAdminId,
+              adminId: organizationAdmin.adminId,
+              ...teacherFields,
             });
           } else if (flag === 6) {
             roleDoc = await ZonalAdmin.create({
-                  zonalAdminId: user.userId,
-                  userId: user.userId,
-                  user: user._id,
-                  superAdminId: parents.superAdmin.adminId,
-                  city : userData.city,
-                  state : userData.state,
-                  pincode : userData.pincode,
-                  address : userData.address,
-                  phone : userData.phone,
-                  country : userData.country,
-                });
+              zonalAdminId: user.userId,
+              userId: user.userId,
+              user: user._id,
+              superAdminId: parents.superAdmin.adminId,
+              city: userData.city,
+              state: userData.state,
+              pincode: userData.pincode,
+              address: userData.address,
+              phone: userData.phone,
+              country: userData.country,
+            });
           } else if (flag === 7) {
             roleDoc = await Admin.create({
               adminId: user.userId,
@@ -475,7 +1257,26 @@ export const registerUser = async (userData) => {
             throw error;
           }
         } catch (roleErr) {
-          await User.deleteOne({ _id: user._id });
+          try {
+            if (flag === 5) {
+              await OrganizationAdmin.deleteOne({
+                userId: user.userId,
+              });
+            }
+
+            if (flag === 3 || flag === 5) {
+              await Teacher.deleteOne({
+                userId: user.userId,
+              });
+            }
+
+            await User.deleteOne({
+              _id: user._id,
+            });
+          } catch (cleanupErr) {
+            console.error("Rollback cleanup error:", cleanupErr);
+          }
+
           throw roleErr;
         }
       } else {
@@ -527,44 +1328,7 @@ export const registerUser = async (userData) => {
     throw error;
   }
 };
-
-// export const loginUser = async (email, password) => {
-//   // Find user and include password
-//   const user = await User.findOne({ email }).select("+password");
-
-//   if (!user) {
-//     const error = new Error("Invalid email or password");
-//     error.statusCode = 401;
-//     throw error;
-//   }
-
-//   //  CHECK STATUS FIRST
-//   if (user.status !== 1) {
-//     const error = new Error("Your account is inactive. Please contact admin.");
-//     error.statusCode = 403;
-//     throw error;
-//   }
-
-//   // Compare password
-//   const isPasswordValid = await user.comparePassword(password);
-
-//   if (!isPasswordValid) {
-//     const error = new Error("Invalid email or password");
-//     error.statusCode = 401;
-//     throw error;
-//   }
-
-//   const token = generateAccessToken(user._id.toString());
-//   const refreshToken = await createRefreshTokenRecord(user._id.toString(), user._id);
-
-//   // Remove password
-//   const userObject = user.toObject();
-//   delete userObject.password;
-
-//   return { user: userObject, token, accessToken: token, refreshToken };
-// };
-
-
+//////////////////
 export const loginUser = async (email, password) => {
   if (!email || !password) {
     const error = new Error("Email and password are required");
@@ -629,6 +1393,376 @@ export const loginUser = async (email, password) => {
   };
 };
 
+export const loginWithGoogle = async (idToken) => {
+  if (typeof idToken !== "string" || !idToken.trim()) {
+    const error = new Error("Google ID token is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!Array.isArray(env.GOOGLE_CLIENT_IDS) || env.GOOGLE_CLIENT_IDS.length === 0) {
+    const error = new Error("Google login is not configured");
+    error.statusCode = 503;
+    throw error;
+  }
+
+  let payload;
+  try {
+    const ticket = await googleOAuthClient.verifyIdToken({
+      idToken,
+      audience: env.GOOGLE_CLIENT_IDS,
+    });
+    payload = ticket.getPayload();
+  } catch {
+    const error = new Error("Invalid Google ID token");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  if (!payload?.email || payload.email_verified !== true) {
+    const error = new Error("Google account email is not verified");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const googleId = payload.sub;
+  if (!googleId) {
+    const error = new Error("Google ID token does not contain a user ID");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const email = payload.email.toLowerCase().trim();
+  const [userByGoogleId, userByEmail] = await Promise.all([
+    User.findOne({ googleId }).select("+password"),
+    User.findOne({ email }).select("+password"),
+  ]);
+
+  if (userByGoogleId && userByEmail && !userByGoogleId._id.equals(userByEmail._id)) {
+    const error = new Error("This Google account is already linked to another user");
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const user = userByGoogleId || userByEmail;
+
+  if (!user) {
+    const error = new Error("No AsDimo account exists for this Google email");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (user.status !== 1) {
+    const error = new Error("Your account is inactive. Please contact admin.");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  // Save only verified identity data from Google's signed ID token. This links
+  // an existing AsDimo account to Google on its first successful Google login.
+  user.googleId = googleId;
+  user.authProvider = "google";
+  user.googleProfile = {
+    name: payload.name || null,
+    picture: payload.picture || null,
+    email,
+  };
+
+  const accessToken = generateAccessToken(user._id.toString());
+  const refreshToken = await createRefreshTokenRecord(
+    user._id.toString(),
+    user._id
+  );
+
+  user.lastLogin = new Date();
+  await user.save();
+
+  const userObject = user.toObject();
+  delete userObject.password;
+
+  return {
+    user: userObject,
+    token: accessToken,
+    accessToken,
+    refreshToken,
+  };
+};
+
+export const signupWithGoogle = async (idToken, userData) => {
+  if (typeof idToken !== "string" || !idToken.trim()) {
+    const error = new Error("Google ID token is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!Array.isArray(env.GOOGLE_CLIENT_IDS) || env.GOOGLE_CLIENT_IDS.length === 0) {
+    const error = new Error("Google signup is not configured");
+    error.statusCode = 503;
+    throw error;
+  }
+
+  let payload;
+  try {
+    const ticket = await googleOAuthClient.verifyIdToken({
+      idToken: idToken.trim(),
+      audience: env.GOOGLE_CLIENT_IDS,
+    });
+    payload = ticket.getPayload();
+  } catch {
+    const error = new Error("Invalid Google ID token");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  if (!payload?.email || payload.email_verified !== true || !payload.sub) {
+    const error = new Error("Google account email is not verified");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const email = payload.email.toLowerCase().trim();
+  const existingUser = await User.findOne({
+    $or: [{ email }, { googleId: payload.sub }],
+  });
+  if (existingUser) {
+    const error = new Error("An AsDimo account already exists for this Google account");
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const registration = await registerUser({
+    ...userData,
+    name: userData.name || payload.name || email.split("@")[0],
+    email,
+  });
+
+  const user = await User.findById(registration.user._id);
+  user.googleId = payload.sub;
+  user.authProvider = "google";
+  user.googleProfile = {
+    name: payload.name || null,
+    picture: payload.picture || null,
+    email,
+  };
+  await user.save();
+
+  return issueSocialAuthTokens(user, registration);
+};
+
+export const loginWithFacebook = async (accessToken) => {
+  if (typeof accessToken !== "string" || !accessToken.trim()) {
+    const error = new Error("Facebook access token is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!env.FACEBOOK_APP_ID || !env.FACEBOOK_APP_SECRET) {
+    const error = new Error("Facebook login is not configured");
+    error.statusCode = 503;
+    throw error;
+  }
+
+  const graphBaseUrl = `https://graph.facebook.com/${env.FACEBOOK_GRAPH_API_VERSION}`;
+  const appAccessToken = `${env.FACEBOOK_APP_ID}|${env.FACEBOOK_APP_SECRET}`;
+  let facebookUser;
+  let validatedFacebookId;
+
+  try {
+    const debugResponse = await axios.get(`${graphBaseUrl}/debug_token`, {
+      params: { input_token: accessToken, access_token: appAccessToken },
+    });
+    const tokenData = debugResponse.data?.data;
+
+    if (!tokenData?.is_valid || String(tokenData.app_id) !== env.FACEBOOK_APP_ID || !tokenData.user_id) {
+      console.warn("Facebook token validation failed", {
+        isValid: tokenData?.is_valid ?? false,
+        hasUserId: Boolean(tokenData?.user_id),
+        belongsToConfiguredApp: String(tokenData?.app_id) === env.FACEBOOK_APP_ID,
+        facebookErrorCode: tokenData?.error?.code,
+        facebookErrorSubcode: tokenData?.error?.error_subcode,
+      });
+      const error = new Error(
+        "Facebook access token is invalid, expired, or belongs to a different Facebook app"
+      );
+      error.statusCode = 401;
+      throw error;
+    }
+    validatedFacebookId = String(tokenData.user_id);
+
+    const profileResponse = await axios.get(`${graphBaseUrl}/me`, {
+      params: {
+        fields: "id,name,email,picture.type(large)",
+        access_token: accessToken,
+      },
+    });
+    facebookUser = profileResponse.data;
+  } catch (caughtError) {
+    if (caughtError.statusCode) {
+      throw caughtError;
+    }
+
+    const facebookError = caughtError.response?.data?.error;
+    console.warn("Facebook token verification request failed", {
+      status: caughtError.response?.status,
+      facebookErrorCode: facebookError?.code,
+      facebookErrorSubcode: facebookError?.error_subcode,
+      facebookErrorType: facebookError?.type,
+    });
+    const error = new Error("Facebook access token could not be verified");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const facebookId = String(facebookUser?.id || "");
+  if (!facebookId) {
+    const error = new Error("Facebook profile does not contain a user ID");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  if (facebookId !== validatedFacebookId) {
+    const error = new Error("Facebook token profile does not match the validated user");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const email = typeof facebookUser.email === "string"
+    ? facebookUser.email.toLowerCase().trim()
+    : null;
+  const [userByFacebookId, userByEmail] = await Promise.all([
+    User.findOne({ facebookId }).select("+password"),
+    email ? User.findOne({ email }).select("+password") : null,
+  ]);
+
+  if (userByFacebookId && userByEmail && !userByFacebookId._id.equals(userByEmail._id)) {
+    const error = new Error("This Facebook account is already linked to another user");
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const user = userByFacebookId || userByEmail;
+  if (!user) {
+    const error = new Error(
+      email
+        ? "No AsDimo account exists for this Facebook email"
+        : "Facebook did not provide an email; link Facebook from an existing account first"
+    );
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (user.status !== 1) {
+    const error = new Error("Your account is inactive. Please contact admin.");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  user.facebookId = facebookId;
+  user.authProvider = "facebook";
+  user.facebookProfile = {
+    name: facebookUser.name || null,
+    picture: facebookUser.picture?.data?.url || null,
+    email,
+  };
+
+  const appJwt = generateAccessToken(user._id.toString());
+  const refreshToken = await createRefreshTokenRecord(user._id.toString(), user._id);
+  user.lastLogin = new Date();
+  await user.save();
+
+  const userObject = user.toObject();
+  delete userObject.password;
+
+  return {
+    user: userObject,
+    token: appJwt,
+    accessToken: appJwt,
+    refreshToken,
+  };
+};
+
+export const signupWithFacebook = async (accessToken, userData) => {
+  if (typeof accessToken !== "string" || !accessToken.trim()) {
+    const error = new Error("Facebook access token is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!env.FACEBOOK_APP_ID || !env.FACEBOOK_APP_SECRET) {
+    const error = new Error("Facebook signup is not configured");
+    error.statusCode = 503;
+    throw error;
+  }
+
+  const graphBaseUrl = `https://graph.facebook.com/${env.FACEBOOK_GRAPH_API_VERSION}`;
+  const appAccessToken = `${env.FACEBOOK_APP_ID}|${env.FACEBOOK_APP_SECRET}`;
+  let facebookUser;
+  try {
+    const debugResponse = await axios.get(`${graphBaseUrl}/debug_token`, {
+      params: { input_token: accessToken.trim(), access_token: appAccessToken },
+    });
+    const tokenData = debugResponse.data?.data;
+    if (!tokenData?.is_valid || String(tokenData.app_id) !== env.FACEBOOK_APP_ID || !tokenData.user_id) {
+      const error = new Error("Facebook access token is invalid, expired, or belongs to a different Facebook app");
+      error.statusCode = 401;
+      throw error;
+    }
+
+    const profileResponse = await axios.get(`${graphBaseUrl}/me`, {
+      params: {
+        fields: "id,name,email,picture.type(large)",
+        access_token: accessToken.trim(),
+      },
+    });
+    facebookUser = profileResponse.data;
+    if (String(facebookUser?.id) !== String(tokenData.user_id)) {
+      const error = new Error("Facebook token profile does not match the validated user");
+      error.statusCode = 401;
+      throw error;
+    }
+  } catch (caughtError) {
+    if (caughtError.statusCode) throw caughtError;
+    const error = new Error("Facebook access token could not be verified");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const facebookId = String(facebookUser.id);
+  const email = typeof facebookUser.email === "string"
+    ? facebookUser.email.toLowerCase().trim()
+    : null;
+  if (!email) {
+    const error = new Error("Facebook did not provide an email address");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const existingUser = await User.findOne({ $or: [{ email }, { facebookId }] });
+  if (existingUser) {
+    const error = new Error("An AsDimo account already exists for this Facebook account");
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const registration = await registerUser({
+    ...userData,
+    name: userData.name || facebookUser.name || email.split("@")[0],
+    email,
+  });
+
+  const user = await User.findById(registration.user._id);
+  user.facebookId = facebookId;
+  user.authProvider = "facebook";
+  user.facebookProfile = {
+    name: facebookUser.name || null,
+    picture: facebookUser.picture?.data?.url || null,
+    email,
+  };
+  await user.save();
+
+  return issueSocialAuthTokens(user, registration);
+};
+
 const withCount = (data) => ({
   count: data.length,
   data,
@@ -641,15 +1775,93 @@ const uniqueNumbers = (values) => [
 const getRelatedCount = (item, key) =>
   item.relatedData?.[key]?.count ?? item.relatedData?.[key]?.data?.length ?? 0;
 
-const normalizeSortOptions = ({ sort, sortBy, sortOrder } = {}) => {
+// const normalizeSortOptions = ({ sort, sortBy, sortOrder } = {}) => {
+//   const sortText = String(sort ?? "").toLowerCase().trim();
+//   const fieldText = String(sortBy ?? "").toLowerCase().trim();
+//   const orderText = String(sortOrder ?? "").toLowerCase().trim();
+//   const joinedSortText = [sortText, fieldText, orderText].filter(Boolean).join(" ");
+//   const compactFieldText = fieldText.replace(/[^a-z0-9]/g, "");
+//   const compactSortText = sortText.replace(/[^a-z0-9]/g, "");
+
+//   let field = "name";
+//   if (["admin", "admins", "admincount", "adminscount"].includes(compactFieldText)) {
+//     field = "admin";
+//   } else if (
+//     [
+//       "organization",
+//       "organizations",
+//       "organisation",
+//       "organisations",
+//       "org",
+//       "orgs",
+//       "organizationcount",
+//       "organizationscount",
+//       "organisationcount",
+//       "organisationscount",
+//       "orgcount",
+//       "orgscount",
+//     ].includes(compactFieldText)
+//   ) {
+//     field = "organizations";
+//   } else if (["name", "username"].includes(fieldText)) {
+//     field = "name";
+//   } else if (
+//     compactSortText.includes("organization") ||
+//     compactSortText.includes("organisation") ||
+//     compactSortText.includes("orgcount")
+//   ) {
+//     field = "organizations";
+//   } else if (compactSortText.includes("admin")) {
+//     field = "admin";
+//   } else if (compactSortText.includes("name")) {
+//     field = "name";
+//   }
+
+//   let direction = orderText || sortText;
+//   if (
+//     joinedSortText.includes("z-a") ||
+//     joinedSortText.includes("za") ||
+//     joinedSortText.includes("desc") ||
+//     joinedSortText.includes("max-min") ||
+//     joinedSortText.includes("max to min")
+//   ) {
+//     direction = "desc";
+//   } else if (
+//     joinedSortText.includes("a-z") ||
+//     joinedSortText.includes("az") ||
+//     joinedSortText.includes("asc") ||
+//     joinedSortText.includes("min-max") ||
+//     joinedSortText.includes("min to max")
+//   ) {
+//     direction = "asc";
+//   }
+
+//   return {
+//     field,
+//     direction: direction === "desc" ? "desc" : "asc",
+//   };
+// };
+
+
+const normalizeSortOptions = ({
+  sort,
+  sortBy,
+  sortOrder,
+} = {}) => {
   const sortText = String(sort ?? "").toLowerCase().trim();
   const fieldText = String(sortBy ?? "").toLowerCase().trim();
   const orderText = String(sortOrder ?? "").toLowerCase().trim();
-  const joinedSortText = [sortText, fieldText, orderText].filter(Boolean).join(" ");
+
+  const joinedSortText = [sortText, fieldText, orderText]
+    .filter(Boolean)
+    .join(" ");
+
   const compactFieldText = fieldText.replace(/[^a-z0-9]/g, "");
   const compactSortText = sortText.replace(/[^a-z0-9]/g, "");
 
-  let field = "name";
+  // Default sorting
+  let field = "createdAt";
+
   if (["admin", "admins", "admincount", "adminscount"].includes(compactFieldText)) {
     field = "admin";
   } else if (
@@ -669,7 +1881,13 @@ const normalizeSortOptions = ({ sort, sortBy, sortOrder } = {}) => {
     ].includes(compactFieldText)
   ) {
     field = "organizations";
-  } else if (["name", "username"].includes(fieldText)) {
+  } else if (
+    ["createdat", "date", "registrationdate", "registereddate"].includes(
+      compactFieldText
+    )
+  ) {
+    field = "createdAt";
+  } else if (["name", "username"].includes(compactFieldText)) {
     field = "name";
   } else if (
     compactSortText.includes("organization") ||
@@ -679,11 +1897,14 @@ const normalizeSortOptions = ({ sort, sortBy, sortOrder } = {}) => {
     field = "organizations";
   } else if (compactSortText.includes("admin")) {
     field = "admin";
+  } else if (compactSortText.includes("createdat") || compactSortText.includes("date")) {
+    field = "createdAt";
   } else if (compactSortText.includes("name")) {
     field = "name";
   }
 
   let direction = orderText || sortText;
+
   if (
     joinedSortText.includes("z-a") ||
     joinedSortText.includes("za") ||
@@ -704,9 +1925,21 @@ const normalizeSortOptions = ({ sort, sortBy, sortOrder } = {}) => {
 
   return {
     field,
-    direction: direction === "desc" ? "desc" : "asc",
+    direction: direction === "asc" ? "asc" : "desc",
   };
 };
+
+// const getSortableValue = (item, field) => {
+//   if (field === "admin") {
+//     return getRelatedCount(item, "admins");
+//   }
+
+//   if (field === "organizations") {
+//     return getRelatedCount(item, "organizations");
+//   }
+
+//   return String(item.name ?? "").toLowerCase();
+// };
 
 const getSortableValue = (item, field) => {
   if (field === "admin") {
@@ -717,7 +1950,15 @@ const getSortableValue = (item, field) => {
     return getRelatedCount(item, "organizations");
   }
 
-  return String(item.name ?? "").toLowerCase();
+  if (field === "createdAt") {
+    return item.createdAt ? new Date(item.createdAt).getTime() : null;
+  }
+
+  if (field === "name") {
+    return String(item.name ?? "").toLowerCase();
+  }
+
+  return null;
 };
 
 const searchableText = (item) =>
@@ -761,26 +2002,348 @@ const applySearchAndSort = (users, options = {}) => {
     return String(firstValue).localeCompare(String(secondValue)) * multiplier;
   });
 };
+///////////////////////// 21/08/2026 ////////////////
+// const getRelatedRoleData = async (user, roleData) => {
+//   if (!roleData || Object.keys(roleData).length === 0) {
+//     return null;
+//   }
+
+//   if (user.flag === 6) {
+//     const admins = await Admin.find({
+//       zonalAdminId: roleData.zonalAdminId,
+//     }).lean();
+//     const adminIds = uniqueNumbers(admins.map((admin) => admin.adminId));
+
+//     const organizations = await OrganizationAdmin.find({
+//       zonalAdminId: roleData.zonalAdminId,
+//       ...(adminIds.length ? { adminId: { $in: adminIds } } : {}),
+//     }).lean();
+
+//     const organizationIds = uniqueNumbers(
+//       organizations.map((org) => org.organizationId)
+//     );
+//     const organizationAdminIds = uniqueNumbers(
+//       organizations.map((org) => org.organizationAdminId)
+//     );
+
+//     const teachers = organizationIds.length
+//       ? await Teacher.find({
+//           $or: [
+//             {
+//               zonalAdminId: roleData.zonalAdminId,
+//               adminId: { $in: adminIds },
+//               organizationId: { $in: organizationIds },
+//             },
+//             {
+//               organizationId: { $in: organizationIds },
+//               organizationAdminId: { $in: organizationAdminIds },
+//             },
+//           ],
+//         }).lean()
+//       : [];
+
+//     const teacherIds = uniqueNumbers(teachers.map((teacher) => teacher.teacherId));
+//     const parents =
+//       organizationIds.length && teacherIds.length
+//         ? await Parent.find({
+//             $or: [
+//               {
+//                 zonalAdminId: roleData.zonalAdminId,
+//                 adminId: { $in: adminIds },
+//                 organizationId: { $in: organizationIds },
+//                 teacherId: { $in: teacherIds },
+//               },
+//               {
+//                 organizationId: { $in: organizationIds },
+//                 therapistId: { $in: teacherIds },
+//               },
+//             ],
+//           }).lean()
+//         : [];
+
+//     return {
+//       admins: withCount(admins),
+//       organizations: withCount(organizations),
+//       teachers: withCount(teachers),
+//       parents: withCount(parents),
+//     };
+//   }
+
+//   if (user.flag === 7) {
+//     const zonalAdmin = await User.findOne({
+//       userId: roleData.zonalAdminId,
+//     }).lean();
+
+//     if (!zonalAdmin) {
+//       return {
+//         organizations: withCount([]),
+//         teachers: withCount([]),
+//         parents: withCount([]),
+//       };
+//     }
+
+//     const organizations = await OrganizationAdmin.find({
+//       zonalAdminId: roleData.zonalAdminId,
+//       adminId: roleData.adminId,
+//     }).lean();
+
+//     const organizationIds = uniqueNumbers(
+//       organizations.map((org) => org.organizationId)
+//     );
+//     const organizationAdminIds = uniqueNumbers(
+//       organizations.map((org) => org.organizationAdminId)
+//     );
+
+//     const teachers = organizationIds.length
+//       ? await Teacher.find({
+//           $or: [
+//             {
+//               zonalAdminId: roleData.zonalAdminId,
+//               adminId: roleData.adminId,
+//               organizationId: { $in: organizationIds },
+//             },
+//             {
+//               organizationId: { $in: organizationIds },
+//               organizationAdminId: { $in: organizationAdminIds },
+//             },
+//           ],
+//         }).lean()
+//       : [];
+
+//     const teacherIds = uniqueNumbers(teachers.map((teacher) => teacher.teacherId));
+//     const parents =
+//       organizationIds.length && teacherIds.length
+//         ? await Parent.find({
+//             $or: [
+//               {
+//                 zonalAdminId: roleData.zonalAdminId,
+//                 adminId: roleData.adminId,
+//                 organizationId: { $in: organizationIds },
+//                 teacherId: { $in: teacherIds },
+//               },
+//               {
+//                 organizationId: { $in: organizationIds },
+//                 therapistId: { $in: teacherIds },
+//               },
+//             ],
+//           }).lean()
+//         : [];
+
+//     return {
+//       zonalAdmin,
+//       organizations: withCount(organizations),
+//       teachers: withCount(teachers),
+//       parents: withCount(parents),
+//     };
+//   }
+
+//   if (user.flag === 1) {
+
+//     const Admin = await User.findOne({
+//       userId: roleData.adminId,
+//     }).lean();
+
+//     if (!Admin) {
+//       return {
+//         organizations: withCount([]),
+//         teachers: withCount([]),
+//         parents: withCount([]),
+//       };
+//     }
+//     const teachers = await Teacher.find({
+//       $or: [
+//         {
+//           zonalAdminId: roleData.zonalAdminId,
+//           adminId: roleData.adminId,
+//           organizationId: roleData.organizationId,
+//         },
+//         {
+//           organizationId: roleData.organizationId,
+//           organizationAdminId: roleData.organizationAdminId,
+//         },
+//       ],
+//     }).lean();
+
+//     const teacherIds = uniqueNumbers(teachers.map((teacher) => teacher.teacherId));
+//     const parents = teacherIds.length
+//       ? await Parent.find({
+//           $or: [
+//             {
+//               zonalAdminId: roleData.zonalAdminId,
+//               adminId: roleData.adminId,
+//               organizationId: roleData.organizationId,
+//               teacherId: { $in: teacherIds },
+//             },
+//             {
+//               organizationId: roleData.organizationId,
+//               therapistId: { $in: teacherIds },
+//             },
+//           ],
+//         }).lean()
+//       : [];
+
+//     return {
+//       Admin,
+//       teachers: withCount(teachers),
+//       parents: withCount(parents),
+//     };
+//   }
+
+//   if (user.flag === 3) {
+
+//     const Admin = await User.findOne({
+//       userId: roleData.adminId,
+//     }).lean();
+
+//     if (!Admin) {
+//       return {
+//         organizations: withCount([]),
+//         teachers: withCount([]),
+//         parents: withCount([]),
+//       };
+//     }
+
+//     const organizations = await User.findOne({
+//       userId: roleData.organizationId,
+//     }).lean();
+
+//     if (!organizations) {
+//       return {
+//         organizations: withCount([]),
+//         teachers: withCount([]),
+//         parents: withCount([]),
+//       };
+//     }
+
+//     const parentFilters = [
+//       {
+//         organizationId: roleData.organizationId,
+//         therapistId: roleData.teacherId,
+//       },
+//     ];
+
+//     if (roleData.zonalAdminId !== undefined && roleData.zonalAdminId !== null) {
+//       parentFilters.push({
+//         zonalAdminId: roleData.zonalAdminId,
+//         adminId: roleData.adminId,
+//         organizationId: roleData.organizationId,
+//         teacherId: roleData.teacherId,
+//       });
+//     }
+
+//     const parents = await Parent.find({
+//       $or: parentFilters,
+//     }).lean();
+
+//     return {
+//       Admin,
+//       organizations,
+//       parents: withCount(parents),
+//     };
+//   }
+
+//   if (user.flag === 2) {
+
+//     const Admin = await User.findOne({
+//       userId: roleData.adminId,
+//     }).lean();
+
+//     if (!Admin) {
+//       return {
+//         organizations: withCount([]),
+//         teachers: withCount([]),
+//         parents: withCount([]),
+//       };
+//     }
+
+//     const organizations = await User.findOne({
+//       userId: roleData.organizationId,
+//     }).lean();
+
+//     if (!organizations) {
+//       return {
+//         organizations: withCount([]),
+//         teachers: withCount([]),
+//         parents: withCount([]),
+//       };
+//     }
+
+//     const parentFilters = [
+//       {
+//         organizationId: roleData.organizationId,
+//         therapistId: roleData.teacherId,
+//       },
+//     ];
+
+//     if (roleData.zonalAdminId !== undefined && roleData.zonalAdminId !== null) {
+//       parentFilters.push({
+//         zonalAdminId: roleData.zonalAdminId,
+//         adminId: roleData.adminId,
+//         organizationId: roleData.organizationId,
+//         teacherId: roleData.teacherId,
+//       });
+//     }
+
+//     const parents = await Parent.find({
+//       $or: parentFilters,
+//     }).lean();
+
+//     return {
+//       Admin,
+//       organizations,
+//       parents: withCount(parents),
+//     };
+//   }
+
+//   return null;
+// };
+////////////////////////////////////////////////////////
 
 const getRelatedRoleData = async (user, roleData) => {
   if (!roleData || Object.keys(roleData).length === 0) {
     return null;
   }
 
+  if (user.flag === 0) {
+    const zonalAdmins = await ZonalAdmin.find({}).lean();
+    const admins = await Admin.find({}).lean();
+    const organizations = await OrganizationAdmin.find({}).lean();
+    const teachers = await Teacher.find({}).lean();
+    const parents = await Parent.find({}).lean();
+    const children = await Child.find({}).lean();
+    const appointments = await Appointment.find({}).lean();
+
+    return {
+      zonalAdmins: withCount(zonalAdmins),
+      admins: withCount(admins),
+      organizations: withCount(organizations),
+      teachers: withCount(teachers),
+      parents: withCount(parents),
+      children: withCount(children),
+      appointments: withCount(appointments),
+    };
+  }
+
   if (user.flag === 6) {
     const admins = await Admin.find({
       zonalAdminId: roleData.zonalAdminId,
     }).lean();
-    const adminIds = uniqueNumbers(admins.map((admin) => admin.adminId));
+
+    const adminIds = uniqueNumbers(
+      admins.map((admin) => admin.adminId)
+    );
 
     const organizations = await OrganizationAdmin.find({
       zonalAdminId: roleData.zonalAdminId,
-      ...(adminIds.length ? { adminId: { $in: adminIds } } : {}),
+      ...(adminIds.length
+        ? { adminId: { $in: adminIds } }
+        : {}),
     }).lean();
 
     const organizationIds = uniqueNumbers(
       organizations.map((org) => org.organizationId)
     );
+
     const organizationAdminIds = uniqueNumbers(
       organizations.map((org) => org.organizationAdminId)
     );
@@ -801,7 +2364,10 @@ const getRelatedRoleData = async (user, roleData) => {
         }).lean()
       : [];
 
-    const teacherIds = uniqueNumbers(teachers.map((teacher) => teacher.teacherId));
+    const teacherIds = uniqueNumbers(
+      teachers.map((teacher) => teacher.teacherId)
+    );
+
     const parents =
       organizationIds.length && teacherIds.length
         ? await Parent.find({
@@ -820,24 +2386,90 @@ const getRelatedRoleData = async (user, roleData) => {
           }).lean()
         : [];
 
+    // Get children against parents
+    const parentIds = uniqueNumbers(
+      parents.map((parent) => parent.parentId)
+    );
+
+    const children = parentIds.length
+      ? await Child.find({
+          parentId: { $in: parentIds },
+        }).lean()
+      : [];
+
+    // Get appointments against parentId + teacherId
+    const appointmentFilters = parents
+      .map((parent) => ({
+        parentId: parent.parentId,
+        teacherId: parent.teacherId,
+      }))
+      .filter(
+        (item) =>
+          item.parentId !== undefined &&
+          item.parentId !== null &&
+          item.teacherId !== undefined &&
+          item.teacherId !== null
+      );
+
+    const appointments = appointmentFilters.length
+      ? await Appointment.find({
+          $or: appointmentFilters,
+        }).lean()
+      : [];
+
     return {
       admins: withCount(admins),
       organizations: withCount(organizations),
       teachers: withCount(teachers),
       parents: withCount(parents),
+      children: withCount(children),
+      appointments: withCount(appointments),
     };
   }
 
   if (user.flag === 7) {
-    const zonalAdmin = await User.findOne({
-      userId: roleData.zonalAdminId,
+    const zonalAdminDoc = await ZonalAdmin.findOne({
+      $or: [
+        { zonalAdminId: roleData.zonalAdminId },
+        { userId: roleData.zonalAdminId },
+      ],
     }).lean();
+
+    let zonalAdmin = null;
+    if (zonalAdminDoc) {
+      const userData = await User.findOne({
+        userId: zonalAdminDoc.userId,
+      })
+        .select("-password")
+        .lean();
+
+      zonalAdmin = {
+        ...zonalAdminDoc,
+        userData,
+      };
+    } else if (roleData.zonalAdminId) {
+      const userData = await User.findOne({
+        userId: roleData.zonalAdminId,
+      })
+        .select("-password")
+        .lean();
+
+      if (userData) {
+        zonalAdmin = {
+          userId: roleData.zonalAdminId,
+          userData,
+        };
+      }
+    }
 
     if (!zonalAdmin) {
       return {
+        zonalAdmin: null,
         organizations: withCount([]),
         teachers: withCount([]),
         parents: withCount([]),
+        children: withCount([]),
+        appointments: withCount([]),
       };
     }
 
@@ -849,6 +2481,7 @@ const getRelatedRoleData = async (user, roleData) => {
     const organizationIds = uniqueNumbers(
       organizations.map((org) => org.organizationId)
     );
+
     const organizationAdminIds = uniqueNumbers(
       organizations.map((org) => org.organizationAdminId)
     );
@@ -869,7 +2502,10 @@ const getRelatedRoleData = async (user, roleData) => {
         }).lean()
       : [];
 
-    const teacherIds = uniqueNumbers(teachers.map((teacher) => teacher.teacherId));
+    const teacherIds = uniqueNumbers(
+      teachers.map((teacher) => teacher.teacherId)
+    );
+
     const parents =
       organizationIds.length && teacherIds.length
         ? await Parent.find({
@@ -888,27 +2524,93 @@ const getRelatedRoleData = async (user, roleData) => {
           }).lean()
         : [];
 
+    // Get children against parents
+    const parentIds = uniqueNumbers(
+      parents.map((parent) => parent.parentId)
+    );
+
+    const children = parentIds.length
+      ? await Child.find({
+          parentId: { $in: parentIds },
+        }).lean()
+      : [];
+
+    // Get appointments against parentId + teacherId
+    const appointmentFilters = parents
+      .map((parent) => ({
+        parentId: parent.parentId,
+        teacherId: parent.teacherId,
+      }))
+      .filter(
+        (item) =>
+          item.parentId !== undefined &&
+          item.parentId !== null &&
+          item.teacherId !== undefined &&
+          item.teacherId !== null
+      );
+
+    const appointments = appointmentFilters.length
+      ? await Appointment.find({
+          $or: appointmentFilters,
+        }).lean()
+      : [];
+
     return {
       zonalAdmin,
       organizations: withCount(organizations),
       teachers: withCount(teachers),
       parents: withCount(parents),
+      children: withCount(children),
+      appointments: withCount(appointments),
     };
   }
 
   if (user.flag === 1) {
-
-    const Admin = await User.findOne({
-      userId: roleData.adminId,
+    const adminDoc = await Admin.findOne({
+      $or: [
+        { adminId: roleData.adminId },
+        { userId: roleData.adminId },
+      ],
     }).lean();
 
-    if (!Admin) {
+    let admin = null;
+    if (adminDoc) {
+      const userData = await User.findOne({
+        userId: adminDoc.userId,
+      })
+        .select("-password")
+        .lean();
+
+      admin = {
+        ...adminDoc,
+        userData,
+      };
+    } else if (roleData.adminId) {
+      const userData = await User.findOne({
+        userId: roleData.adminId,
+      })
+        .select("-password")
+        .lean();
+
+      if (userData) {
+        admin = {
+          userId: roleData.adminId,
+          userData,
+        };
+      }
+    }
+
+    if (!admin) {
       return {
-        organizations: withCount([]),
+        Admin: null,
+        admin: null,
         teachers: withCount([]),
         parents: withCount([]),
+        children: withCount([]),
+        appointments: withCount([]),
       };
     }
+
     const teachers = await Teacher.find({
       $or: [
         {
@@ -923,7 +2625,10 @@ const getRelatedRoleData = async (user, roleData) => {
       ],
     }).lean();
 
-    const teacherIds = uniqueNumbers(teachers.map((teacher) => teacher.teacherId));
+    const teacherIds = uniqueNumbers(
+      teachers.map((teacher) => teacher.teacherId)
+    );
+
     const parents = teacherIds.length
       ? await Parent.find({
           $or: [
@@ -941,37 +2646,115 @@ const getRelatedRoleData = async (user, roleData) => {
         }).lean()
       : [];
 
+    // Get children against parents
+    const parentIds = uniqueNumbers(
+      parents.map((parent) => parent.parentId)
+    );
+
+    const children = parentIds.length
+      ? await Child.find({
+          parentId: { $in: parentIds },
+        }).lean()
+      : [];
+
+    // Get appointments against parentId + teacherId
+    const appointmentFilters = parents
+      .map((parent) => ({
+        parentId: parent.parentId,
+        teacherId: parent.teacherId,
+      }))
+      .filter(
+        (item) =>
+          item.parentId !== undefined &&
+          item.parentId !== null &&
+          item.teacherId !== undefined &&
+          item.teacherId !== null
+      );
+
+    const appointments = appointmentFilters.length
+      ? await Appointment.find({
+          $or: appointmentFilters,
+        }).lean()
+      : [];
+
     return {
-      Admin,
+      Admin: admin,
+      admin,
       teachers: withCount(teachers),
       parents: withCount(parents),
+      children: withCount(children),
+      appointments: withCount(appointments),
     };
   }
 
-  if (user.flag === 3) {
-
-    const Admin = await User.findOne({
-      userId: roleData.adminId,
+  if (user.flag === 3 || user.flag === 5) {
+    const adminDoc = await Admin.findOne({
+      $or: [
+        { adminId: roleData.adminId },
+        { userId: roleData.adminId },
+      ],
     }).lean();
 
-    if (!Admin) {
-      return {
-        organizations: withCount([]),
-        teachers: withCount([]),
-        parents: withCount([]),
+    let admin = null;
+    if (adminDoc) {
+      const userData = await User.findOne({
+        userId: adminDoc.userId,
+      })
+        .select("-password")
+        .lean();
+
+      admin = {
+        ...adminDoc,
+        userData,
       };
+    } else if (roleData.adminId) {
+      const userData = await User.findOne({
+        userId: roleData.adminId,
+      })
+        .select("-password")
+        .lean();
+
+      if (userData) {
+        admin = {
+          userId: roleData.adminId,
+          userData,
+        };
+      }
     }
 
-    const organizations = await User.findOne({
-      userId: roleData.organizationId,
+    const orgDoc = await OrganizationAdmin.findOne({
+      $or: [
+        { organizationId: roleData.organizationId },
+        { organizationAdminId: roleData.organizationId },
+        { userId: roleData.organizationId },
+      ],
     }).lean();
 
-    if (!organizations) {
-      return {
-        organizations: withCount([]),
-        teachers: withCount([]),
-        parents: withCount([]),
+    let organization = null;
+    if (orgDoc) {
+      const userData = await User.findOne({
+        userId: orgDoc.userId,
+      })
+        .select("-password")
+        .lean();
+
+      organization = {
+        ...orgDoc,
+        userData,
       };
+    } else if (roleData.organizationId) {
+      const userData = await User.findOne({
+        userId: roleData.organizationId,
+      })
+        .select("-password")
+        .lean();
+
+      if (userData) {
+        organization = {
+          userId: roleData.organizationId,
+          userData,
+        };
+      }
     }
 
     const parentFilters = [
@@ -981,7 +2764,10 @@ const getRelatedRoleData = async (user, roleData) => {
       },
     ];
 
-    if (roleData.zonalAdminId !== undefined && roleData.zonalAdminId !== null) {
+    if (
+      roleData.zonalAdminId !== undefined &&
+      roleData.zonalAdminId !== null
+    ) {
       parentFilters.push({
         zonalAdminId: roleData.zonalAdminId,
         adminId: roleData.adminId,
@@ -994,39 +2780,154 @@ const getRelatedRoleData = async (user, roleData) => {
       $or: parentFilters,
     }).lean();
 
+    // Get children against parents
+    const parentIds = uniqueNumbers(
+      parents.map((parent) => parent.parentId)
+    );
+
+    const children = parentIds.length
+      ? await Child.find({
+          parentId: { $in: parentIds },
+        }).lean()
+      : [];
+
+    // Get appointments against parentId + teacherId
+    const appointmentFilters = parents
+      .map((parent) => ({
+        parentId: parent.parentId,
+        teacherId: parent.teacherId,
+      }))
+      .filter(
+        (item) =>
+          item.parentId !== undefined &&
+          item.parentId !== null &&
+          item.teacherId !== undefined &&
+          item.teacherId !== null
+      );
+
+    const appointments = appointmentFilters.length
+      ? await Appointment.find({
+          $or: appointmentFilters,
+        }).lean()
+      : [];
+
     return {
-      Admin,
-      organizations,
+      Admin: admin,
+      admin,
+      organizations: organization,
+      organization,
       parents: withCount(parents),
+      children: withCount(children),
+      appointments: withCount(appointments),
     };
   }
 
-  if (user.flag === 2) {
-
-    const Admin = await User.findOne({
-      userId: roleData.adminId,
+  if (user.flag === 2 || user.flag === 4) {
+    const adminDoc = await Admin.findOne({
+      $or: [
+        { adminId: roleData.adminId },
+        { userId: roleData.adminId },
+      ],
     }).lean();
 
-    if (!Admin) {
-      return {
-        organizations: withCount([]),
-        teachers: withCount([]),
-        parents: withCount([]),
+    let admin = null;
+    if (adminDoc) {
+      const userData = await User.findOne({
+        userId: adminDoc.userId,
+      })
+        .select("-password")
+        .lean();
+
+      admin = {
+        ...adminDoc,
+        userData,
       };
+    } else if (roleData.adminId) {
+      const userData = await User.findOne({
+        userId: roleData.adminId,
+      })
+        .select("-password")
+        .lean();
+
+      if (userData) {
+        admin = {
+          userId: roleData.adminId,
+          userData,
+        };
+      }
     }
 
-    const organizations = await User.findOne({
-      userId: roleData.organizationId,
+    const orgDoc = await OrganizationAdmin.findOne({
+      $or: [
+        { organizationId: roleData.organizationId },
+        { organizationAdminId: roleData.organizationId },
+        { userId: roleData.organizationId },
+      ],
     }).lean();
 
-    if (!organizations) {
-      return {
-        organizations: withCount([]),
-        teachers: withCount([]),
-        parents: withCount([]),
+    let organization = null;
+    if (orgDoc) {
+      const userData = await User.findOne({
+        userId: orgDoc.userId,
+      })
+        .select("-password")
+        .lean();
+
+      organization = {
+        ...orgDoc,
+        userData,
       };
+    } else if (roleData.organizationId) {
+      const userData = await User.findOne({
+        userId: roleData.organizationId,
+      })
+        .select("-password")
+        .lean();
+
+      if (userData) {
+        organization = {
+          userId: roleData.organizationId,
+          userData,
+        };
+      }
     }
 
+    // Get teacher
+    const teacherDoc = await Teacher.findOne({
+      $or: [
+        { teacherId: roleData.teacherId },
+        { userId: roleData.teacherId },
+      ],
+    }).lean();
+
+    let teacherWithUserData = null;
+    if (teacherDoc) {
+      const userData = await User.findOne({
+        userId: teacherDoc.userId,
+      })
+        .select("-password")
+        .lean();
+
+      teacherWithUserData = {
+        ...teacherDoc,
+        userData,
+      };
+    } else if (roleData.teacherId) {
+      const userData = await User.findOne({
+        userId: roleData.teacherId,
+      })
+        .select("-password")
+        .lean();
+
+      if (userData) {
+        teacherWithUserData = {
+          userId: roleData.teacherId,
+          userData,
+        };
+      }
+    }
+
+    // Get parents assigned to this teacher
     const parentFilters = [
       {
         organizationId: roleData.organizationId,
@@ -1034,7 +2935,10 @@ const getRelatedRoleData = async (user, roleData) => {
       },
     ];
 
-    if (roleData.zonalAdminId !== undefined && roleData.zonalAdminId !== null) {
+    if (
+      roleData.zonalAdminId !== undefined &&
+      roleData.zonalAdminId !== null
+    ) {
       parentFilters.push({
         zonalAdminId: roleData.zonalAdminId,
         adminId: roleData.adminId,
@@ -1047,13 +2951,48 @@ const getRelatedRoleData = async (user, roleData) => {
       $or: parentFilters,
     }).lean();
 
+    // Get children against parents
+    const parentIds = uniqueNumbers(
+      parents.map((parent) => parent.parentId)
+    );
+
+    const children = parentIds.length
+      ? await Child.find({
+          parentId: { $in: parentIds },
+        }).lean()
+      : [];
+
+    // Get appointments against parentId + teacherId
+    const appointmentFilters = parents
+      .map((parent) => ({
+        parentId: parent.parentId,
+        teacherId: parent.teacherId,
+      }))
+      .filter(
+        (item) =>
+          item.parentId !== undefined &&
+          item.parentId !== null &&
+          item.teacherId !== undefined &&
+          item.teacherId !== null
+      );
+
+    const appointments = appointmentFilters.length
+      ? await Appointment.find({
+          $or: appointmentFilters,
+        }).lean()
+      : [];
+
     return {
-      Admin,
-      organizations,
+      Admin: admin,
+      admin,
+      organizations: organization,
+      organization,
+      teacher: teacherWithUserData,
       parents: withCount(parents),
+      children: withCount(children),
+      appointments: withCount(appointments),
     };
   }
-
   return null;
 };
 
@@ -1089,6 +3028,36 @@ export const getUserById = async (userId) => {
 
   const relatedData = await getRelatedRoleData(user, roleData);
 
+  if (relatedData?.zonalAdmins?.data) {
+    relatedData.zonalAdmins.data = await enrichWithUserData(
+      relatedData.zonalAdmins.data
+    );
+  }
+
+  if (relatedData?.admins?.data) {
+    relatedData.admins.data = await enrichWithUserData(
+      relatedData.admins.data
+    );
+  }
+
+  if (relatedData?.organizations?.data) {
+    relatedData.organizations.data = await enrichWithUserData(
+      relatedData.organizations.data
+    );
+  }
+
+  if (relatedData?.teachers?.data) {
+    relatedData.teachers.data = await enrichWithUserData(
+      relatedData.teachers.data
+    );
+  }
+
+  if (relatedData?.parents?.data) {
+    relatedData.parents.data = await enrichWithUserData(
+      relatedData.parents.data
+    );
+  }
+
   return {
     user,
     roleData,
@@ -1099,9 +3068,12 @@ export const getUserById = async (userId) => {
 export const updateProfileById = async (
   userId,
   profileData
-  ) => {
-
+) => {
   const allowedUpdates = {};
+
+  // =========================
+  // USER PROFILE FIELDS
+  // =========================
 
   if (profileData.name !== undefined) {
     allowedUpdates.name = profileData.name;
@@ -1112,37 +3084,39 @@ export const updateProfileById = async (
   }
 
   if (profileData.profileImg !== undefined) {
-    allowedUpdates.profileImg =
-      profileData.profileImg;
+    allowedUpdates.profileImg = profileData.profileImg;
   }
+
   if (profileData.phone !== undefined) {
     allowedUpdates.phone = profileData.phone;
   }
+
   if (profileData.city !== undefined) {
     allowedUpdates.city = profileData.city;
   }
+
   if (profileData.state !== undefined) {
     allowedUpdates.state = profileData.state;
   }
+
   if (profileData.pincode !== undefined) {
     allowedUpdates.pincode = profileData.pincode;
   }
+
   if (profileData.address !== undefined) {
     allowedUpdates.address = profileData.address;
   }
+
   if (profileData.country !== undefined) {
     allowedUpdates.country = profileData.country;
   }
 
-  const user = await User.findByIdAndUpdate(
-    userId,
-    allowedUpdates,
-    {
-      returnDocument: "after",
-      runValidators: true,
-      context: "query",
-    }
-  ).select("-password");
+  // =========================
+  // FIND USER
+  // =========================
+
+  const user = await User.findById(userId)
+    .select("-password");
 
   if (!user) {
     const error = new Error("User not found");
@@ -1150,8 +3124,133 @@ export const updateProfileById = async (
     throw error;
   }
 
-  return user;
+  // =========================
+  // UPDATE USER
+  // =========================
+
+  if (Object.keys(allowedUpdates).length > 0) {
+    await User.findByIdAndUpdate(
+      userId,
+      allowedUpdates,
+      {
+        returnDocument: "after",
+        runValidators: true,
+        context: "query",
+      }
+    );
+  }
+
+  // =========================
+  // UPDATE TEACHER
+  // =========================
+
+  const teacherUpdates = {};
+
+  if (profileData.yearsOfExperience !== undefined) {
+    teacherUpdates.yearsOfExperience =
+      Number(profileData.yearsOfExperience);
+  }
+
+  if (profileData.therapist_category !== undefined) {
+    teacherUpdates.therapist_category =
+      profileData.therapist_category;
+  }
+
+  if (profileData.languages !== undefined) {
+    teacherUpdates.languages =
+      Array.isArray(profileData.languages)
+        ? profileData.languages
+        : String(profileData.languages)
+            .split(",")
+            .map((lang) => lang.trim())
+            .filter(Boolean);
+  }
+
+  if (profileData.cliniqueName !== undefined) {
+    teacherUpdates.cliniqueName =
+      profileData.cliniqueName;
+  }
+
+  // Only update Teacher when Teacher fields are present
+  if (Object.keys(teacherUpdates).length > 0) {
+    await Teacher.findOneAndUpdate(
+      {
+        userId: user.userId,
+      },
+      teacherUpdates,
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+  }
+
+  // =========================
+  // RETURN UPDATED USER
+  // =========================
+
+  const updatedUser = await User.findById(userId)
+    .select("-password");
+
+  return updatedUser;
 };
+
+// export const updateProfileById = async (
+//   userId,
+//   profileData
+//   ) => {
+
+//   const allowedUpdates = {};
+
+//   if (profileData.name !== undefined) {
+//     allowedUpdates.name = profileData.name;
+//   }
+
+//   if (profileData.email !== undefined) {
+//     allowedUpdates.email = profileData.email;
+//   }
+
+//   if (profileData.profileImg !== undefined) {
+//     allowedUpdates.profileImg =
+//       profileData.profileImg;
+//   }
+//   if (profileData.phone !== undefined) {
+//     allowedUpdates.phone = profileData.phone;
+//   }
+//   if (profileData.city !== undefined) {
+//     allowedUpdates.city = profileData.city;
+//   }
+//   if (profileData.state !== undefined) {
+//     allowedUpdates.state = profileData.state;
+//   }
+//   if (profileData.pincode !== undefined) {
+//     allowedUpdates.pincode = profileData.pincode;
+//   }
+//   if (profileData.address !== undefined) {
+//     allowedUpdates.address = profileData.address;
+//   }
+//   if (profileData.country !== undefined) {
+//     allowedUpdates.country = profileData.country;
+//   }
+
+//   const user = await User.findByIdAndUpdate(
+//     userId,
+//     allowedUpdates,
+//     {
+//       returnDocument: "after",
+//       runValidators: true,
+//       context: "query",
+//     }
+//   ).select("-password");
+
+//   if (!user) {
+//     const error = new Error("User not found");
+//     error.statusCode = 404;
+//     throw error;
+//   }
+
+//   return user;
+// };
 
 // export const getAllUsersService = async (flag) => {
 //   const users = await User.find({ flag }).select("-password");
@@ -1167,7 +3266,9 @@ export const updateProfileById = async (
 
 
 export const getAllUsersService = async (flag, options = {}) => {
-  const users = await User.find({ flag }).select("-password").lean();
+  const users = await User.find({ flag })
+    .select("-password")
+    .lean();
 
   if (!users || users.length === 0) {
     const error = new Error("No users found");
@@ -1180,41 +3281,30 @@ export const getAllUsersService = async (flag, options = {}) => {
       let roleData = null;
 
       switch (user.flag) {
+        case 0:
+          roleData = await SuperAdmin.findOne({ userId: user.userId }).lean();
+          break;
+
         case 1:
-          roleData =
-            await OrganizationAdmin.findOne({
-              userId: user.userId,
-            }).lean();
+          roleData = await OrganizationAdmin.findOne({ userId: user.userId }).lean();
           break;
 
         case 2:
         case 4:
-          roleData =
-            await Parent.findOne({
-              userId: user.userId,
-            }).lean();
+          roleData = await Parent.findOne({ userId: user.userId }).lean();
           break;
 
         case 3:
         case 5:
-          roleData =
-            await Teacher.findOne({
-              userId: user.userId,
-            }).lean();
+          roleData = await Teacher.findOne({ userId: user.userId }).lean();
           break;
 
         case 6:
-          roleData =
-            await ZonalAdmin.findOne({
-              userId: user.userId,
-            }).lean();
+          roleData = await ZonalAdmin.findOne({ userId: user.userId }).lean();
           break;
 
         case 7:
-          roleData =
-            await Admin.findOne({
-              userId: user.userId,
-            }).lean();
+          roleData = await Admin.findOne({ userId: user.userId }).lean();
           break;
 
         default:
@@ -1222,6 +3312,457 @@ export const getAllUsersService = async (flag, options = {}) => {
       }
 
       const relatedData = await getRelatedRoleData(user, roleData);
+
+      if (relatedData?.zonalAdmins?.data) {
+        relatedData.zonalAdmins.data = await enrichWithUserData(relatedData.zonalAdmins.data);
+      }
+
+      if (relatedData?.admins?.data) {
+        relatedData.admins.data = await enrichWithUserData(relatedData.admins.data);
+      }
+
+      if (relatedData?.organizations?.data) {
+        relatedData.organizations.data = await enrichWithUserData(relatedData.organizations.data);
+      }
+
+      if (relatedData?.teachers?.data) {
+        relatedData.teachers.data = await enrichWithUserData(relatedData.teachers.data);
+      }
+
+      if (relatedData?.parents?.data) {
+        relatedData.parents.data = await enrichWithUserData(relatedData.parents.data);
+      }
+
+      if (relatedData?.zonalAdmin && !relatedData.zonalAdmin.userData) {
+        relatedData.zonalAdmin = await enrichSingleWithUserData(relatedData.zonalAdmin);
+      }
+
+      if (relatedData?.Admin && !relatedData.Admin.userData) {
+        relatedData.Admin = await enrichSingleWithUserData(relatedData.Admin);
+      }
+
+      if (relatedData?.admin && !relatedData.admin.userData) {
+        relatedData.admin = await enrichSingleWithUserData(relatedData.admin);
+      }
+
+      if (
+        relatedData?.organizations &&
+        !relatedData.organizations.data &&
+        !relatedData.organizations.userData
+      ) {
+        relatedData.organizations = await enrichSingleWithUserData(
+          relatedData.organizations
+        );
+      }
+
+      if (relatedData?.organization && !relatedData.organization.userData) {
+        relatedData.organization = await enrichSingleWithUserData(relatedData.organization);
+      }
+
+      if (relatedData?.teacher && !relatedData.teacher.userData) {
+        relatedData.teacher = await enrichSingleWithUserData(relatedData.teacher);
+      }
+
+      return {
+        ...user,
+        roleData,
+        relatedData,
+      };
+    })
+  );
+
+  // Check whether the frontend has explicitly requested sorting.
+  const hasUserSelectedSort =
+    options?.sortBy &&
+    options.sortBy !== "name" &&
+    options?.sortOrder;
+
+  // Default: latest registrations first.
+  if (!hasUserSelectedSort) {
+    return applySearchAndSort(enrichedUsers, {
+      ...options,
+      sortBy: "createdAt",
+      sortOrder: "desc",
+    });
+  }
+
+  // User-selected sorting.
+  return applySearchAndSort(enrichedUsers, options);
+};
+
+// export const getAllUsersService = async (flag, options = {}) => {
+//   const users = await User.find({ flag }).select("-password").lean();
+
+//   if (!users || users.length === 0) {
+//     const error = new Error("No users found");
+//     error.statusCode = 404;
+//     throw error;
+//   }
+
+//   const enrichedUsers = await Promise.all(
+//     users.map(async (user) => {
+//       let roleData = null;
+
+//       switch (user.flag) {
+//         case 0:
+//           roleData =
+//             await SuperAdmin.findOne({
+//               userId: user.userId,
+//             }).lean();
+//           break;
+
+//         case 1:
+//           roleData =
+//             await OrganizationAdmin.findOne({
+//               userId: user.userId,
+//             }).lean();
+//           break;
+
+//         case 2:
+//         case 4:
+//           roleData =
+//             await Parent.findOne({
+//               userId: user.userId,
+//             }).lean();
+//           break;
+
+//         case 3:
+//         case 5:
+//           roleData =
+//             await Teacher.findOne({
+//               userId: user.userId,
+//             }).lean();
+//           break;
+
+//         case 6:
+//           roleData =
+//             await ZonalAdmin.findOne({
+//               userId: user.userId,
+//             }).lean();
+//           break;
+
+//         case 7:
+//           roleData =
+//             await Admin.findOne({
+//               userId: user.userId,
+//             }).lean();
+//           break;
+
+//         default:
+//           roleData = null;
+//       }
+
+//       const relatedData = await getRelatedRoleData(user, roleData);
+
+//       if (relatedData?.zonalAdmins?.data) {
+//         relatedData.zonalAdmins.data = await enrichWithUserData(
+//           relatedData.zonalAdmins.data
+//         );
+//       }
+
+//       if (relatedData?.admins?.data) {
+//         relatedData.admins.data = await enrichWithUserData(
+//           relatedData.admins.data
+//         );
+//       }
+
+//       if (relatedData?.organizations?.data) {
+//         relatedData.organizations.data = await enrichWithUserData(
+//           relatedData.organizations.data
+//         );
+//       }
+
+//       if (relatedData?.teachers?.data) {
+//         relatedData.teachers.data = await enrichWithUserData(
+//           relatedData.teachers.data
+//         );
+//       }
+
+//       if (relatedData?.parents?.data) {
+//         relatedData.parents.data = await enrichWithUserData(
+//           relatedData.parents.data
+//         );
+//       }
+
+//       if (relatedData?.zonalAdmin && !relatedData.zonalAdmin.userData) {
+//         relatedData.zonalAdmin = await enrichSingleWithUserData(
+//           relatedData.zonalAdmin
+//         );
+//       }
+
+//       if (relatedData?.Admin && !relatedData.Admin.userData) {
+//         relatedData.Admin = await enrichSingleWithUserData(
+//           relatedData.Admin
+//         );
+//       }
+
+//       if (relatedData?.admin && !relatedData.admin.userData) {
+//         relatedData.admin = await enrichSingleWithUserData(
+//           relatedData.admin
+//         );
+//       }
+
+//       if (
+//         relatedData?.organizations &&
+//         !relatedData.organizations.data &&
+//         !relatedData.organizations.userData
+//       ) {
+//         relatedData.organizations = await enrichSingleWithUserData(
+//           relatedData.organizations
+//         );
+//       }
+
+//       if (relatedData?.organization && !relatedData.organization.userData) {
+//         relatedData.organization = await enrichSingleWithUserData(
+//           relatedData.organization
+//         );
+//       }
+
+//       if (relatedData?.teacher && !relatedData.teacher.userData) {
+//         relatedData.teacher = await enrichSingleWithUserData(
+//           relatedData.teacher
+//         );
+//       }
+
+//       return {
+//         ...user,
+//         roleData,
+//         relatedData,
+//       };
+//     })
+//   );
+
+//   return applySearchAndSort(enrichedUsers, options);
+// };
+
+export const getRelatedRoleDataRelation = async (
+  user,
+  roleData,
+  relationUserId
+) => {
+  switch (user.flag) {
+
+    // ==========================
+    // Zonal Admin
+    // ==========================
+    case 6:
+      return {
+        admins: {
+          count: await User.countDocuments({
+            flag: 7,
+            zonalAdminId: relationUserId,
+          }),
+          data: await User.find({
+            flag: 7,
+            zonalAdminId: relationUserId,
+          }).select("-password"),
+        },
+
+        organizations: {
+          count: await User.countDocuments({
+            flag: 1,
+            zonalAdminId: relationUserId,
+          }),
+          data: await User.find({
+            flag: 1,
+            zonalAdminId: relationUserId,
+          }).select("-password"),
+        },
+
+        teachers: {
+          count: await User.countDocuments({
+            flag: { $in: [3, 5] },
+            zonalAdminId: relationUserId,
+          }),
+          data: await User.find({
+            flag: { $in: [3, 5] },
+            zonalAdminId: relationUserId,
+          }).select("-password"),
+        },
+
+        parents: {
+          count: await User.countDocuments({
+            flag: { $in: [2, 4] },
+            zonalAdminId: relationUserId,
+          }),
+          data: await User.find({
+            flag: { $in: [2, 4] },
+            zonalAdminId: relationUserId,
+          }).select("-password"),
+        },
+      };
+
+    // ==========================
+    // Admin
+    // ==========================
+    case 7:
+      return {
+        organizations: {
+          count: await User.countDocuments({
+            flag: 1,
+            adminId: relationUserId,
+          }),
+          data: await User.find({
+            flag: 1,
+            adminId: relationUserId,
+          }).select("-password"),
+        },
+
+        teachers: {
+          count: await User.countDocuments({
+            flag: { $in: [3, 5] },
+            adminId: relationUserId,
+          }),
+          data: await User.find({
+            flag: { $in: [3, 5] },
+            adminId: relationUserId,
+          }).select("-password"),
+        },
+
+        parents: {
+          count: await User.countDocuments({
+            flag: { $in: [2, 4] },
+            adminId: relationUserId,
+          }),
+          data: await User.find({
+            flag: { $in: [2, 4] },
+            adminId: relationUserId,
+          }).select("-password"),
+        },
+      };
+
+    // ==========================
+    // Organization Admin
+    // ==========================
+    case 1:
+      return {
+        teachers: {
+          count: await User.countDocuments({
+            flag: { $in: [3, 5] },
+            organizationAdminId: relationUserId,
+          }),
+          data: await User.find({
+            flag: { $in: [3, 5] },
+            organizationAdminId: relationUserId,
+          }).select("-password"),
+        },
+
+        parents: {
+          count: await User.countDocuments({
+            flag: { $in: [2, 4] },
+            organizationAdminId: relationUserId,
+          }),
+          data: await User.find({
+            flag: { $in: [2, 4] },
+            organizationAdminId: relationUserId,
+          }).select("-password"),
+        },
+      };
+
+    // ==========================
+    // Teacher
+    // ==========================
+    case 3:
+    case 5:
+      return {
+        parents: {
+          count: await User.countDocuments({
+            flag: { $in: [2, 4] },
+            teacherId: relationUserId,
+          }),
+          data: await User.find({
+            flag: { $in: [2, 4] },
+            teacherId: relationUserId,
+          }).select("-password"),
+        },
+      };
+
+    // ==========================
+    // Parent
+    // ==========================
+    case 2:
+    case 4:
+      return {
+        parents: {
+          count: await User.countDocuments({
+            flag: { $in: [2, 4] },
+            parentId: relationUserId,
+          }),
+          data: await User.find({
+            flag: { $in: [2, 4] },
+            parentId: relationUserId,
+          }).select("-password"),
+        },
+      };
+
+    default:
+      return {};
+  }
+};
+
+export const getAllUsersByRelationService = async (flag,userId,options = {}) => {
+  let users = [];
+
+  if (flag === 0) {
+    users = await User.find({})
+      .select("-password")
+      .lean();
+  } else {
+    users = await User.find({
+      flag,
+      userId,
+    })
+      .select("-password")
+      .lean();
+  }
+
+  if (!users.length) {
+    throw new Error("No users found");
+  }
+
+  const enrichedUsers = await Promise.all(
+    users.map(async (user) => {
+      let roleData = null;
+
+      switch (user.flag) {
+        case 1:
+          roleData = await OrganizationAdmin.findOne({
+            userId: user.userId,
+          }).lean();
+          break;
+
+        case 2:
+        case 4:
+          roleData = await Parent.findOne({
+            userId: user.userId,
+          }).lean();
+          break;
+
+        case 3:
+        case 5:
+          roleData = await Teacher.findOne({
+            userId: user.userId,
+          }).lean();
+          break;
+
+        case 6:
+          roleData = await ZonalAdmin.findOne({
+            userId: user.userId,
+          }).lean();
+          break;
+
+        case 7:
+          roleData = await OrganizationAdmin.findOne({
+            userId: user.userId,
+          }).lean();
+          break;
+      }
+
+      const relatedData = await getRelatedRoleDataRelation(
+        user,
+        roleData,
+        user.userId // <-- pass current user's userId
+      );
 
       return {
         ...user,
@@ -1721,6 +4262,7 @@ const deleteUserById = async (userId, session) => {
     throw new Error("Invalid flag");
   }
 
+  await RefreshToken.deleteMany({ user: user._id }).session(session);
   await User.deleteOne({ _id: userId }).session(session);
 };
 
@@ -1840,20 +4382,60 @@ export const resetPasswordWithOTP = async (email, otp, newPassword) => {
 };
 
 const enrichWithUserData = async (items = []) => {
+  if (!Array.isArray(items)) return [];
   return Promise.all(
     items.map(async (item) => {
-      const userData = await User.findOne({
-        userId: item.userId,
-      })
-        .select("-password")
-        .lean();
+      if (!item) return item;
+      if (item.userData) return item;
+
+      const targetUserId =
+        item.userId ??
+        item.adminId ??
+        item.zonalAdminId ??
+        item.teacherId ??
+        item.parentId ??
+        item.organizationAdminId;
+
+      const userData = targetUserId
+        ? await User.findOne({
+            userId: targetUserId,
+          })
+            .select("-password")
+            .lean()
+        : null;
 
       return {
         ...item,
-        userData,
+        userData: userData || null,
       };
     })
   );
+};
+
+const enrichSingleWithUserData = async (item) => {
+  if (!item) return null;
+  if (item.userData) return item;
+
+  const targetUserId =
+    item.userId ??
+    item.adminId ??
+    item.zonalAdminId ??
+    item.teacherId ??
+    item.parentId ??
+    item.organizationAdminId;
+
+  const userData = targetUserId
+    ? await User.findOne({
+        userId: targetUserId,
+      })
+        .select("-password")
+        .lean()
+    : null;
+
+  return {
+    ...item,
+    userData: userData || null,
+  };
 };
 
 export const getAllUsersServiceById = async (userId) => {
@@ -1870,6 +4452,12 @@ export const getAllUsersServiceById = async (userId) => {
   let roleData = null;
 
   switch (user.flag) {
+    case 0:
+      roleData = await SuperAdmin.findOne({
+        userId: user.userId,
+      }).lean();
+      break;
+
     case 1:
       roleData = await OrganizationAdmin.findOne({
         userId: user.userId,
@@ -1908,6 +4496,12 @@ export const getAllUsersServiceById = async (userId) => {
 
   const relatedData = await getRelatedRoleData(user, roleData);
 
+  if (relatedData?.zonalAdmins?.data) {
+    relatedData.zonalAdmins.data = await enrichWithUserData(
+      relatedData.zonalAdmins.data
+    );
+  }
+
   if (relatedData?.admins?.data) {
     relatedData.admins.data = await enrichWithUserData(
       relatedData.admins.data
@@ -1932,9 +4526,904 @@ export const getAllUsersServiceById = async (userId) => {
     );
   }
 
+  if (relatedData?.zonalAdmin && !relatedData.zonalAdmin.userData) {
+    relatedData.zonalAdmin = await enrichSingleWithUserData(
+      relatedData.zonalAdmin
+    );
+  }
+
+  if (relatedData?.Admin && !relatedData.Admin.userData) {
+    relatedData.Admin = await enrichSingleWithUserData(
+      relatedData.Admin
+    );
+  }
+
+  if (relatedData?.admin && !relatedData.admin.userData) {
+    relatedData.admin = await enrichSingleWithUserData(
+      relatedData.admin
+    );
+  }
+
+  if (
+    relatedData?.organizations &&
+    !relatedData.organizations.data &&
+    !relatedData.organizations.userData
+  ) {
+    relatedData.organizations = await enrichSingleWithUserData(
+      relatedData.organizations
+    );
+  }
+
+  if (relatedData?.organization && !relatedData.organization.userData) {
+    relatedData.organization = await enrichSingleWithUserData(
+      relatedData.organization
+    );
+  }
+
+  if (relatedData?.teacher && !relatedData.teacher.userData) {
+    relatedData.teacher = await enrichSingleWithUserData(
+      relatedData.teacher
+    );
+  }
+
   return {
     ...user,
     roleData,
     relatedData,
   };
+};
+
+export const addChildInformationService = async (parentId, childData) => {
+  const numericParentId = toPositiveNumber(parentId, "parentId");
+  const parent = await Parent.findOne({ parentId: numericParentId });
+
+  if (!parent) {
+    const error = new Error("Parent not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const existingChild = await Child.exists({ parentId: parent.parentId });
+  if (existingChild) {
+    const error = new Error("Child information already exists for this parentId");
+    error.statusCode = 409;
+    throw error;
+  }
+
+  try {
+    return await Child.create({
+      parentId: parent.parentId,
+      childName: childData.childName,
+      childGender: childData.childGender,
+      childAge: Number(childData.childAge),
+      grade: childData.grade,
+      familyType: childData.familyType,
+      language: childData.language,
+      dob: childData.dob,
+    });
+  } catch (error) {
+    // The unique index covers concurrent requests that pass the check above.
+    if (error?.code === 11000 && error?.keyPattern?.parentId) {
+      const conflictError = new Error(
+        "Child information already exists for this parentId"
+      );
+      conflictError.statusCode = 409;
+      throw conflictError;
+    }
+    throw error;
+  }
+};
+
+export const saveQuestionAnswerService = async ({ parentId, questionAnswers }) => {
+  if (!Number.isFinite(Number(parentId)) || Number(parentId) <= 0) {
+    const error = new Error("A valid parentId is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const numericParentId = toPositiveNumber(parentId, "parentId");
+  const parent = await Parent.findOne({ parentId: numericParentId });
+
+  if (!parent) {
+    const error = new Error("Parent not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const existingChild = await Personalize.exists({ parentId: parent.parentId });
+  if (existingChild) {
+    const error = new Error("Child information already exists for this parentId");
+    error.statusCode = 409;
+    throw error;
+  }
+
+  if (!Array.isArray(questionAnswers) || questionAnswers.length === 0) {
+    const error = new Error("questionAnswers must contain at least one question and answer");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const answers = questionAnswers.map(({ question, answer }) => {
+    if (typeof question !== "string" || !question.trim()) {
+      const error = new Error("Each questionAnswers item requires a question");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (answer === undefined || answer === null) {
+      const error = new Error("Each questionAnswers item requires an answer");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    return { question: question.trim(), answer };
+  });
+
+  return Personalize.findOneAndUpdate(
+    { parentId: Number(parentId) },
+    {
+      $setOnInsert: { parentId: Number(parentId) },
+      $push: { questionAnswers: { $each: answers } },
+    },
+    { new: true, upsert: true, runValidators: true }
+  );
+};
+
+export const getQuestionAnswerService = async (parentId) => {
+  const users = await Personalize.find({ parentId }).select();
+
+  if (!users || users.length === 0) {
+    const error = new Error("No data found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return users;
+};
+
+export const updateQuestionAnswerService = async ({ parentId, questionAnswers }) => {
+  if (!Number.isFinite(Number(parentId)) || Number(parentId) <= 0) {
+    const error = new Error("A valid parentId is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const numericParentId = toPositiveNumber(parentId, "parentId");
+  const parent = await Parent.findOne({ parentId: numericParentId });
+
+  if (!parent) {
+    const error = new Error("Parent not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const existingChild = await Personalize.exists({ parentId: parent.parentId });
+  if (existingChild) {
+    const error = new Error("Child information already exists for this parentId");
+    error.statusCode = 409;
+    throw error;
+  }
+
+  if (!Array.isArray(questionAnswers) || questionAnswers.length === 0) {
+    const error = new Error("questionAnswers must contain at least one question and answer");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const answers = questionAnswers.map(({ question, answer }) => {
+    if (typeof question !== "string" || !question.trim()) {
+      const error = new Error("Each questionAnswers item requires a question");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (answer === undefined || answer === null) {
+      const error = new Error("Each questionAnswers item requires an answer");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    return { question: question.trim(), answer };
+  });
+
+  return Personalize.findOneAndUpdate(
+    { parentId: Number(parentId) },
+    {
+      $setOnInsert: { parentId: Number(parentId) },
+      $push: { questionAnswers: { $each: answers } },
+    },
+    { new: true, upsert: true, runValidators: true }
+  );
+};
+
+
+export const updateUserRelationService = async ({flag,userId,updatedUserId}) => {
+  const numericFlag = Number(flag);
+  const currentUserId = Number(userId);
+  const newUserId = Number(updatedUserId);
+
+  // console.log("numericFlag.....................",numericFlag);
+  // console.log("currentUserId.....................",currentUserId);
+  // console.log("newUserId.....................",newUserId);
+
+  if (!Number.isInteger(numericFlag)) {
+    const error = new Error("Invalid flag");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!Number.isInteger(currentUserId) || currentUserId <= 0) {
+    const error = new Error("Invalid userId");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!Number.isInteger(newUserId) || newUserId <= 0) {
+    const error = new Error("Invalid updatedUserId");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  /*
+   * FLAG 0 & FLAG 6
+   *
+   * Existing Parent:
+   *   userId = current parent
+   *
+   * 1. parent.adminId = updatedUserId
+   *
+   * 2. Find Admin where:
+   *      Admin.userId === updatedUserId or adminId === updatedUserId
+   *
+   * 3. Get Admin.zonalAdminId
+   *
+   * 4. parent.zonalAdminId = Admin.zonalAdminId
+   */
+  if (numericFlag === 4) {
+    const parent = await Parent.findOne({
+      userId: currentUserId,
+    });
+
+    // console.log("parent.....................",parent);
+
+    if (!parent) {
+      const error = new Error(
+        `Parent not found with userId ${currentUserId}`
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const admin = await Admin.findOne({
+      $or: [{ userId: newUserId }, { adminId: newUserId }],
+    });
+
+    if (!admin) {
+      const error = new Error(
+        `Admin not found with userId ${newUserId}`
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (!admin.zonalAdminId) {
+      const error = new Error(
+        `Admin with userId ${newUserId} does not have a zonalAdminId`
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    parent.adminId = newUserId;
+    parent.zonalAdminId = admin.zonalAdminId;
+
+    await parent.save();
+
+    return {
+      flag: numericFlag,
+      userId: currentUserId,
+      updatedUserId: newUserId,
+      type: "Parent",
+      data: parent,
+    };
+  }
+
+  /*
+   * FLAG 7
+   *
+   * Existing Admin:
+   *   userId = current admin
+   *
+   * Update:
+   *   Admin.zonalAdminId = updatedUserId
+   */
+  if (numericFlag === 7) {
+    const admin = await Admin.findOne({
+      userId: currentUserId,
+    });
+
+    if (!admin) {
+      const error = new Error(
+        `Admin not found with userId ${currentUserId}`
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const zonalAdmin = await ZonalAdmin.findOne({
+      zonalAdminId: newUserId,
+    });
+
+    if (!zonalAdmin) {
+      const error = new Error(
+        `Zonal Admin not found with userId ${newUserId}`
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    admin.zonalAdminId = newUserId;
+
+    await admin.save();
+
+    return {
+      flag: numericFlag,
+      userId: currentUserId,
+      updatedUserId: newUserId,
+      type: "Admin",
+      data: admin,
+    };
+  }
+
+  /*
+   * FLAG 1
+   *
+   * Existing Organization Admin:
+   *   userId = organization admin
+   *
+   * 1. organizationadmins.adminId = updatedUserId
+   *
+   * 2. Find Admin where:
+   *      Admin.userId === updatedUserId
+   *
+   * 3. Get Admin.zonalAdminId
+   *
+   * 4. organizationadmins.zonalAdminId =
+   *      Admin.zonalAdminId
+   */
+  if (numericFlag === 1) {
+    const organizationAdmin = await OrganizationAdmin.findOne({
+      userId: currentUserId,
+    });
+
+    if (!organizationAdmin) {
+      const error = new Error(
+        `Organization Admin not found with userId ${currentUserId}`
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const admin = await Admin.findOne({
+      userId: newUserId,
+    });
+
+    if (!admin) {
+      const error = new Error(
+        `Admin not found with userId ${newUserId}`
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    organizationAdmin.adminId = newUserId;
+    organizationAdmin.zonalAdminId = admin.zonalAdminId;
+
+    await organizationAdmin.save();
+
+    return {
+      flag: numericFlag,
+      userId: currentUserId,
+      updatedUserId: newUserId,
+      type: "OrganizationAdmin",
+      data: organizationAdmin,
+    };
+  }
+
+  /*
+   * FLAG 3
+   *
+   * Existing Teacher/Therapist:
+   *   userId = teacher
+   *
+   * updatedUserId = new Organization Admin
+   *
+   * Find OrganizationAdmin:
+   *   organizationAdminId === updatedUserId
+   *
+   * Then update Teacher:
+   *
+   *   organizationAdminId = OrganizationAdmin.organizationAdminId
+   *   organizationId      = OrganizationAdmin.organizationId
+   *   adminId             = OrganizationAdmin.adminId
+   *   zonalAdminId        = OrganizationAdmin.zonalAdminId
+   */
+  if (numericFlag === 3) {
+    const teacher = await Teacher.findOne({
+      userId: currentUserId,
+    });
+
+    if (!teacher) {
+      const error = new Error(
+        `Teacher not found with userId ${currentUserId}`
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const organizationAdmin = await OrganizationAdmin.findOne({
+      organizationAdminId: newUserId,
+    });
+
+    if (!organizationAdmin) {
+      const error = new Error(
+        `Organization Admin not found with organizationAdminId ${newUserId}`
+      );
+      error.statusCode = 404;
+      throw error;
+    }
+
+    teacher.organizationAdminId =
+      organizationAdmin.organizationAdminId;
+
+    teacher.organizationId =
+      organizationAdmin.organizationId;
+
+    teacher.adminId =
+      organizationAdmin.adminId;
+
+    teacher.zonalAdminId =
+      organizationAdmin.zonalAdminId;
+
+    await teacher.save();
+
+    return {
+      flag: numericFlag,
+      userId: currentUserId,
+      updatedUserId: newUserId,
+      type: "Teacher",
+      data: teacher,
+    };
+  }
+
+  const error = new Error(
+    "Relation update is supported only for flag 0, 1, 3, 6, and 7"
+  );
+  error.statusCode = 400;
+  throw error;
+};
+
+export const authenticateWithGoogle = async (
+  idToken,
+  userData = {}
+) => {
+  // --------------------------------------------------
+  // 1. Validate ID token
+  // --------------------------------------------------
+
+  if (typeof idToken !== "string" || !idToken.trim()) {
+    const error = new Error("Google ID token is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // --------------------------------------------------
+  // 2. Check Google configuration
+  // --------------------------------------------------
+
+  if (
+    !Array.isArray(env.GOOGLE_CLIENT_IDS) ||
+    env.GOOGLE_CLIENT_IDS.length === 0
+  ) {
+    const error = new Error(
+      "Google authentication is not configured"
+    );
+    error.statusCode = 503;
+    throw error;
+  }
+
+  // --------------------------------------------------
+  // 3. Verify Google ID token
+  // --------------------------------------------------
+
+  let payload;
+
+  try {
+    const ticket = await googleOAuthClient.verifyIdToken({
+      idToken: idToken.trim(),
+      audience: env.GOOGLE_CLIENT_IDS,
+    });
+
+    payload = ticket.getPayload();
+  } catch {
+    const error = new Error("Invalid Google ID token");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  // --------------------------------------------------
+  // 4. Validate Google account
+  // --------------------------------------------------
+
+  if (
+    !payload?.email ||
+    payload.email_verified !== true ||
+    !payload.sub
+  ) {
+    const error = new Error(
+      "Google account email is not verified"
+    );
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const googleId = payload.sub;
+  const email = payload.email.toLowerCase().trim();
+
+  // --------------------------------------------------
+  // 5. Check whether user already exists
+  // --------------------------------------------------
+
+  const [userByGoogleId, userByEmail] = await Promise.all([
+    User.findOne({ googleId }).select("+password"),
+    User.findOne({ email }).select("+password"),
+  ]);
+
+  // Google ID and email belong to different accounts
+  if (
+    userByGoogleId &&
+    userByEmail &&
+    !userByGoogleId._id.equals(userByEmail._id)
+  ) {
+    const error = new Error(
+      "This Google account is already linked to another user"
+    );
+    error.statusCode = 409;
+    throw error;
+  }
+
+  // Existing user
+  let user = userByGoogleId || userByEmail;
+
+  let isNewUser = false;
+  let registration = null;
+
+  // --------------------------------------------------
+  // 6. User does NOT exist -> register
+  // --------------------------------------------------
+
+  if (!user) {
+    isNewUser = true;
+
+    /*
+     * If your registerUser requires flag,
+     * send it from frontend.
+     *
+     * Here 4 is only an example/default.
+     * Change this according to your application.
+     */
+    const flag =
+      userData.flag !== undefined
+        ? userData.flag
+        : 4;
+
+    registration = await registerUser({
+      ...userData,
+
+      flag,
+
+      name:
+        userData.name ||
+        payload.name ||
+        email.split("@")[0],
+
+      email,
+    });
+
+    const createdUserId =
+      registration?.user?._id ||
+      registration?._id ||
+      registration?.user;
+
+    user = await User.findById(createdUserId);
+  }
+
+  // --------------------------------------------------
+  // 7. Make sure user exists
+  // --------------------------------------------------
+
+  if (!user) {
+    const error = new Error(
+      "Failed to authenticate user"
+    );
+    error.statusCode = 500;
+    throw error;
+  }
+
+  // --------------------------------------------------
+  // 8. Check account status
+  // --------------------------------------------------
+
+  if (user.status !== 1) {
+    const error = new Error(
+      "Your account is inactive. Please contact admin."
+    );
+    error.statusCode = 403;
+    throw error;
+  }
+
+  // --------------------------------------------------
+  // 9. Link Google account
+  // --------------------------------------------------
+
+  user.googleId = googleId;
+
+  user.authProvider = "google";
+
+  user.googleProfile = {
+    name: payload.name || null,
+    picture: payload.picture || null,
+    email,
+  };
+
+  user.lastLogin = new Date();
+
+  await user.save();
+
+  // --------------------------------------------------
+  // 10. Generate login tokens
+  // --------------------------------------------------
+
+  let accessToken;
+  let refreshToken;
+  let userObject;
+
+  /*
+   * For a newly registered user, use your existing
+   * social token function if registerUser returns
+   * the required registration information.
+   */
+  if (registration) {
+    const tokens = await issueSocialAuthTokens(
+      user,
+      registration
+    );
+
+    return {
+      ...tokens,
+      isNewUser: true,
+    };
+  }
+
+  // Existing user
+  accessToken = generateAccessToken(
+    user._id.toString()
+  );
+
+  refreshToken = await createRefreshTokenRecord(
+    user._id.toString(),
+    user._id
+  );
+
+  userObject = user.toObject();
+
+  delete userObject.password;
+
+  return {
+    user: userObject,
+    token: accessToken,
+    accessToken,
+    refreshToken,
+    isNewUser: false,
+  };
+};
+
+const googleOAuthClient = new OAuth2Client();
+
+export const getUsersByFlag2And4Service = async (options = {}) => {
+  const users = await User.find({ flag: { $in: [2, 4] } , status: 1 })
+    .select("-password")
+    .lean();
+
+  if (!users || users.length === 0) {
+    return [];
+  }
+
+  const enrichedUsers = await Promise.all(
+    users.map(async (user) => {
+      const roleData = await Parent.findOne({ userId: user.userId }).lean();
+      const relatedData = await getRelatedRoleData(user, roleData);
+
+      if (relatedData?.Admin && !relatedData.Admin.userData) {
+        relatedData.Admin = await enrichSingleWithUserData(relatedData.Admin);
+      }
+
+      if (relatedData?.admin && !relatedData.admin.userData) {
+        relatedData.admin = await enrichSingleWithUserData(relatedData.admin);
+      }
+
+      if (
+        relatedData?.organizations &&
+        !relatedData.organizations.data &&
+        !relatedData.organizations.userData
+      ) {
+        relatedData.organizations = await enrichSingleWithUserData(
+          relatedData.organizations
+        );
+      }
+
+      if (relatedData?.organization && !relatedData.organization.userData) {
+        relatedData.organization = await enrichSingleWithUserData(
+          relatedData.organization
+        );
+      }
+
+      if (relatedData?.teacher && !relatedData.teacher.userData) {
+        relatedData.teacher = await enrichSingleWithUserData(
+          relatedData.teacher
+        );
+      }
+
+      if (relatedData?.parents?.data) {
+        relatedData.parents.data = await enrichWithUserData(
+          relatedData.parents.data
+        );
+      }
+
+      return {
+        ...user,
+        roleData,
+        relatedData,
+      };
+    })
+  );
+
+  const hasUserSelectedSort =
+    options?.sortBy &&
+    options.sortBy !== "name" &&
+    options?.sortOrder;
+
+  if (!hasUserSelectedSort) {
+    return applySearchAndSort(enrichedUsers, {
+      ...options,
+      sortBy: "createdAt",
+      sortOrder: "desc",
+    });
+  }
+
+  return applySearchAndSort(enrichedUsers, options);
+};
+
+const escapeRegex = (value) =>
+  String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export const getTeachersAvailabilityByCityAndCategoryService = async ({
+  city,
+  therapist_category,
+}) => {
+  const trimmedCity = String(city ?? "").trim();
+  const trimmedCategory = String(therapist_category ?? "").trim();
+
+  if (!trimmedCity || !trimmedCategory) {
+    const error = new Error("city and therapist_category are required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const cityRegex = new RegExp(`^${escapeRegex(trimmedCity)}$`, "i");
+  const categoryRegex = new RegExp(`^${escapeRegex(trimmedCategory)}$`, "i");
+
+  // 1. Get users from User table against city
+  const users = await User.find({
+    city: cityRegex,
+  })
+    .select("-password")
+    .lean();
+
+  if (!users.length) {
+    return [];
+  }
+
+  const userIdsFromCity = users
+    .map((u) => u.userId)
+    .filter((id) => id !== undefined && id !== null);
+
+  // 2. Get teachers from Teacher table against therapist_category and matched userIds
+  const teachers = await Teacher.find({
+    userId: { $in: userIdsFromCity },
+    therapist_category: categoryRegex,
+  }).lean();
+
+  if (!teachers.length) {
+    return [];
+  }
+
+  // 3. Get the teachers' userId and fetch data from availabilities table against userId
+  const teacherUserIds = teachers
+    .map((t) => t.userId)
+    .filter((id) => id !== undefined && id !== null);
+
+  const availabilities = await Availability.find({
+    userId: { $in: teacherUserIds },
+  }).lean();
+
+  const userMap = new Map(users.map((u) => [u.userId, u]));
+  const availabilityMap = new Map();
+
+  for (const slot of availabilities) {
+    if (!availabilityMap.has(slot.userId)) {
+      availabilityMap.set(slot.userId, []);
+    }
+    availabilityMap.get(slot.userId).push(slot);
+  }
+
+  return teachers.map((teacher) => {
+    const userData = userMap.get(teacher.userId) || null;
+    const teacherAvailabilities = availabilityMap.get(teacher.userId) || [];
+
+    return {
+      ...(userData || {}),
+      userId: teacher.userId,
+      userData,
+      teacherData: teacher,
+      availabilities: teacherAvailabilities,
+    };
+  });
+};
+
+
+export const getDistinctCitiesService = async () => {
+  const rawCities = await User.distinct("city", {
+    city: { $nin: [null, ""] },
+  });
+
+  const seen = new Set();
+  const uniqueCities = [];
+
+  for (const city of rawCities) {
+    if (typeof city !== "string") continue;
+    const trimmed = city.trim();
+    if (!trimmed) continue;
+
+    const normalized = trimmed.toLowerCase();
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      uniqueCities.push(trimmed);
+    }
+  }
+
+  return uniqueCities;
+};
+
+export const getDistinctTherapistCategoriesService = async () => {
+  const rawCategories = await Teacher.distinct("therapist_category", {
+    therapist_category: { $nin: [null, ""] },
+  });
+
+  const seen = new Set();
+  const uniqueCategories = [];
+
+  for (const category of rawCategories) {
+    if (typeof category !== "string") continue;
+    const trimmed = category.trim();
+    if (!trimmed) continue;
+
+    const normalized = trimmed.toLowerCase();
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      uniqueCategories.push(trimmed);
+    }
+  }
+
+  return uniqueCategories;
 };
