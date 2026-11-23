@@ -1,8 +1,16 @@
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /dev/asDimo/asDimoWebApp/
-  RewriteRule ^index\.html$ - [L]
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /dev/asDimo/asDimoWebApp/index.html [L]
+
+  # Force the root URL to load dist/index.html instead of the dev index.html
+  RewriteRule ^$ dist/index.html [L]
+
+  # Serve built JS, CSS, and image files from dist/
+  RewriteCond %{REQUEST_URI} !^/dev/asDimo/asDimoWebApp/dist/
+  RewriteCond %{DOCUMENT_ROOT}/dev/asDimo/asDimoWebApp/dist/$1 -f
+  RewriteRule ^(.*)$ dist/$1 [L]
+
+  # Send all other React Router routes to dist/index.html
+  RewriteCond %{REQUEST_URI} !^/dev/asDimo/asDimoWebApp/dist/
+  RewriteRule ^ dist/index.html [L]
 </IfModule>
