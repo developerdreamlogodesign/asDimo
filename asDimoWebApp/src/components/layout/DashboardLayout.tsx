@@ -7,12 +7,12 @@ import { Outlet } from "react-router-dom";
 const DashboardLayOut: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(
-    window.innerWidth >= 768
+    window.innerWidth >= 1025
   );
 
   useEffect(() => {
     const handleResize = () => {
-      const desktop = window.innerWidth >= 768;
+      const desktop = window.innerWidth >= 1025;
 
       setIsDesktop(desktop);
 

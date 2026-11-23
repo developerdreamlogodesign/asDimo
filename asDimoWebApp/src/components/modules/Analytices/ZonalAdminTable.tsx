@@ -30,9 +30,25 @@ const ZonalAdminTable: React.FC<ZonalAdminTableProps> = ({ rows, loading = false
   const handleViewDetails = (userId: string | number) => {
     // Keep the id in the URL as well as navigation state so this profile can
     // be opened directly or refreshed without losing the selected user.
-    navigate(`${routes.SUP_ZONALADMIN_DETAILS}?userId=${encodeURIComponent(String(userId))}`, {
-      state: { userId },
-    });
+    // console.log("...........userFlag",userFlag);
+    if(userFlag == 1){
+      navigate(`${routes.ORGANIZATIONADMIN_THERAPIST_DETAILS}?userId=${encodeURIComponent(String(userId))}`, {
+        state: { userId },
+      });
+    }else if(userFlag == 6){
+      navigate(`${routes.ZONAL_ADMIN_DETAILS}?userId=${encodeURIComponent(String(userId))}`, {
+        state: { userId },
+      });
+    }else if(userFlag == 7){
+      navigate(`${routes.ADMIN_ORGANIZATION_DETAILS}?userId=${encodeURIComponent(String(userId))}`, {
+        state: { userId },
+      });
+    }else{
+      navigate(`${routes.SUP_ZONALADMIN_DETAILS}?userId=${encodeURIComponent(String(userId))}`, {
+        state: { userId },
+      });
+    }
+
   };
 
   const allColumns = [

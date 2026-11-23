@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import {UserIcon, ArrowLeftIcon, HomeIcon, CalendarDaysIcon, XIcon, ChevronDownIcon, IdCardIcon } from 'lucide-animated';
+import { UserIcon, ArrowLeftIcon, HomeIcon, CalendarDaysIcon, XIcon, IdCardIcon, CheckIcon } from 'lucide-animated';
 import { Heading1, Paragraph, Paragraph2 } from "../../components/ui/HeadingPara";
 import DashboardButtons from "../../components/ui/Buttons";
 import { BASE_URL, filebasename } from "../../api/config";
-import { tokenManager } from "../../services/tokenManager";
+import { tokenManager, getDoneBy } from "../../services/tokenManager";
 import Loader from "../../components/ui/Loaders";
+import { getCurrentUserRole } from "../../middleware/AuthMiddleware";
 import "./AppointmentDetails.css";
+import "../../components/ui/UIstyles.css";
+import Button from "../../components/ui/Buttons";
+// import ModalBox from "../../components/ui/ModalBox";
 
 interface UserDetails {
   userId?: number;
@@ -27,6 +31,9 @@ interface AppointmentDetailsData {
   date: string;
   time: string;
   status: string;
+  doneBy?: string;
+  paymentStatus?: string;
+  amount?: number;
   paymentId?: string | number;
   razorpayPaymentId?: string;
   zoomLink?: string;
@@ -90,9 +97,14 @@ const AppointmentDetails: React.FC = () => {
   const [cancellationReason, setCancellationReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [statusActionLoading, setStatusActionLoading] = useState<"approved" | "rejected" | null>(null);
+  const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [paymentDetails, setPaymentDetails] = useState<PaymentDetailsData | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  const currentUser = tokenManager.getUser();
+  const userFlag = currentUser?.flag !== undefined ? Number(currentUser.flag) : null;
 
   useEffect(() => {
     const fetchAppointment = async () => {
@@ -121,7 +133,7 @@ const AppointmentDetails: React.FC = () => {
         setAppointment(appointmentData);
 
         const paymentId = appointmentData.paymentId ?? appointmentData.razorpayPaymentId;
-        if (paymentId !== undefined && paymentId !== null && paymentId !== "") {
+        if (paymentId !== undefined && paymentId !== null && String(paymentId).trim() !== "") {
           setPaymentLoading(true);
           const paymentResponse = await fetch(
             `${BASE_URL}/payments/${encodeURIComponent(String(paymentId))}`,
@@ -136,10 +148,12 @@ const AppointmentDetails: React.FC = () => {
           const paymentResponseData = await paymentResponse.json().catch(() => null);
 
           if (!paymentResponse.ok || !paymentResponseData?.success) {
-            throw new Error(paymentResponseData?.message || "Unable to load payment details");
+            setPaymentDetails(null);
+          } else {
+            setPaymentDetails((paymentResponseData.data as PaymentDetailsData) || null);
           }
 
-          setPaymentDetails(paymentResponseData.data as PaymentDetailsData);
+          // paymentDetails handled above
         }
 
         if (appointmentData.teacherUser?.userId) {
@@ -224,7 +238,10 @@ const AppointmentDetails: React.FC = () => {
           "Content-Type": "application/json",
           Authorization: token ? `Bearer ${token}` : "",
         },
-        body: JSON.stringify({ reason: cancellationReason.trim() }),
+        body: JSON.stringify({
+          reason: cancellationReason.trim(),
+          doneBy: getDoneBy(userFlag),
+        }),
       });
       const responseData = await response.json().catch(() => null);
 
@@ -232,7 +249,35 @@ const AppointmentDetails: React.FC = () => {
         throw new Error(responseData?.message || "Unable to cancel appointment");
       }
 
-      setAppointment((current) => current ? { ...current, status: responseData.data?.status || "cancelled" } : current);
+      let updatedStatus = responseData.data?.status || "cancelled";
+
+      // // If superadmin (0), zonal admin (6), or admin (7), auto-call status update to "approved"
+      // if (userFlag !== null && [0, 6, 7].includes(userFlag)) {
+      //   try {
+      //     const statusRes = await fetch(`${BASE_URL}/therapists/appointments/status`, {
+      //       method: "PATCH",
+      //       headers: {
+      //         "Content-Type": "application/json",
+      //         Authorization: token ? `Bearer ${token}` : "",
+      //       },
+      //       body: JSON.stringify({
+      //         appointmentId: appointment._id,
+      //         status: "approved",
+      //         doneBy: getDoneBy(userFlag),
+      //       }),
+      //     });
+      //     const statusData = await statusRes.json().catch(() => null);
+      //     if (statusData?.data?.status) {
+      //       updatedStatus = statusData.data.status;
+      //     } else {
+      //       updatedStatus = "approved";
+      //     }
+      //   } catch (statusErr) {
+      //     console.error("Error auto-approving appointment after cancel:", statusErr);
+      //   }
+      // }
+
+      setAppointment((current) => current ? { ...current, status: updatedStatus } : current);
       setActiveModal(null);
       setCancellationReason("");
     } catch (cancelError) {
@@ -263,6 +308,7 @@ const AppointmentDetails: React.FC = () => {
           date: selectedDate,
           time: selectedTime,
           reason: rescheduleReason.trim(),
+          doneBy: getDoneBy(userFlag),
         }),
       });
       const responseData = await response.json().catch(() => null);
@@ -271,11 +317,39 @@ const AppointmentDetails: React.FC = () => {
         throw new Error(responseData?.message || "Unable to reschedule appointment");
       }
 
+      let updatedStatus = responseData?.data?.status || appointment.status || "rescheduled";
+
+      // If superadmin (0), zonal admin (6), or admin (7), auto-call status update to "approved"
+      // if (userFlag !== null && [0, 6, 7].includes(userFlag)) {
+      //   try {
+      //     const statusRes = await fetch(`${BASE_URL}/therapists/appointments/status`, {
+      //       method: "PATCH",
+      //       headers: {
+      //         "Content-Type": "application/json",
+      //         Authorization: token ? `Bearer ${token}` : "",
+      //       },
+      //       body: JSON.stringify({
+      //         appointmentId: appointment._id,
+      //         status: "approved",
+      //         doneBy: getDoneBy(userFlag),
+      //       }),
+      //     });
+      //     const statusData = await statusRes.json().catch(() => null);
+      //     if (statusData?.data?.status) {
+      //       updatedStatus = statusData.data.status;
+      //     } else {
+      //       updatedStatus = "approved";
+      //     }
+      //   } catch (statusErr) {
+      //     console.error("Error auto-approving appointment after reschedule:", statusErr);
+      //   }
+      // }
+
       setAppointment((current) => current ? {
         ...current,
         date: responseData.data?.date || selectedDate,
         time: responseData.data?.time || selectedTime,
-        status: responseData.data?.status || current.status,
+        status: updatedStatus,
       } : current);
       setActiveModal(null);
       setRescheduleReason("");
@@ -286,10 +360,79 @@ const AppointmentDetails: React.FC = () => {
     }
   };
 
+  const handleUpdateStatus = async (newStatus: "approved" | "rejected") => {
+    if (!appointment?._id) return;
+
+    setStatusActionLoading(newStatus);
+    setStatusMessage(null);
+
+    try {
+      const token = tokenManager.getAccessToken();
+      const response = await fetch(`${BASE_URL}/therapists/appointments/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+        body: JSON.stringify({
+          appointmentId: appointment._id,
+          status: newStatus,
+          doneBy: getDoneBy(userFlag),
+        }),
+      });
+
+      const responseData = await response.json().catch(() => null);
+
+      if (!response.ok || (responseData && responseData.success === false)) {
+        throw new Error(responseData?.message || `Failed to update appointment status to ${newStatus}`);
+      }
+
+      const updatedStatus = responseData?.data?.status || newStatus;
+      setAppointment((current) => current ? { ...current, status: updatedStatus } : current);
+      setStatusMessage({
+        type: "success",
+        text: `Appointment status updated to "${newStatus}" successfully.`,
+      });
+    } catch (statusErr) {
+      console.error("Status update error:", statusErr);
+      setStatusMessage({
+        type: "error",
+        text: statusErr instanceof Error ? statusErr.message : "Failed to update appointment status",
+      });
+    } finally {
+      setStatusActionLoading(null);
+    }
+  };
+
   if (loading) return <Loader fullScreen />;
   if (error || !appointment) {
     return <div className="error-message appointment-details-error">{error || "Appointment not found"}</div>;
   }
+
+  const isAllowedRole = userFlag !== null && [0, 1, 6, 7].includes(userFlag);
+  const currentRole = getCurrentUserRole() ?? "";
+  const isTeachersOrgOrGlobal = currentRole === "TeachersOrg" || currentRole === "teachersGlobal" || (userFlag !== null && [3, 5].includes(userFlag));
+  const isTeacherRole = userFlag !== null && [3, 5].includes(userFlag);
+
+  const appointmentStatus = (appointment.status || "").toLowerCase();
+  const isCancelledOrRescheduled = appointmentStatus === "cancelled" || appointmentStatus === "canceled" || appointmentStatus === "rescheduled";
+  const doneBy = (appointment.doneBy || "").toLowerCase();
+  const isAdminDoneBy = ["admin", "superadmin", "zonaladmin"].includes(doneBy);
+
+  const getDisplayStatus = () => {
+    const rawStatus = appointment.status || "";
+    if (!rawStatus) return "N/A";
+    const rawStatusLower = rawStatus.toLowerCase();
+    if (isAdminDoneBy) {
+      if (["rejected", "cancelled", "canceled", "rescheduled"].includes(rawStatusLower)) {
+        return `${rawStatus} by ${appointment.doneBy}`;
+      }
+      return `${rawStatus} by ${appointment.doneBy}`;
+    }
+    return rawStatus;
+  };
+
+  const showApproveReject = isAllowedRole && isCancelledOrRescheduled && !isAdminDoneBy;
 
   const parent = appointment.parentUser || {};
   const child = appointment.childDetails?.[0] || {};  
@@ -313,7 +456,7 @@ const AppointmentDetails: React.FC = () => {
     { label: "Contact", value: teacher.phone },
     { label: "Appointment Date", value: appointment.date },
     { label: "Appointment Time", value: appointment.time },
-    { label: "Status", value: appointment.status },
+    { label: "Status", value: getDisplayStatus() },
     { label: "Zoom Link", value: appointment.zoomLink },
   ];
   const organisationInfo = [
@@ -335,28 +478,88 @@ const InfoRow: React.FC<InfoRowProps> = ({ label, value }) =>
           <span className="info-label">{label}</span>
           <strong className="info-value">{valueOrFallback(value)}</strong>
       </div>;
-
   return (
     <>
       <div className="appointment-header">
         <div>
-          <Heading1 text="Appointment DETAILS" /><Paragraph text="View and manage appointment information." /></div>
+          <Heading1 text="Appointment DETAILS" />
+          <Paragraph text="View and manage appointment information." /></div>
           <div className="header-actions">
-             <DashboardButtons 
-                text="Reschedule" 
-                variant="blueborder" 
-                textsize="sm" icon={<CalendarDaysIcon size={18} />} 
-                onClick={() => { setActionError(null); 
-                setActiveModal("reschedule"); }} 
-              />
-             <DashboardButtons 
-                text="Cancel Appointment" 
-                variant="redborder" 
-                textsize="sm" 
-                icon={<XIcon size={18} />} 
-                onClick={() => { setActionError(null); 
-                setActiveModal("cancel"); }} 
-             />
+             {isAdminDoneBy ? (
+               <div
+                 className="status-display-badge"
+                 style={{
+                   padding: "8px 16px",
+                   borderRadius: "6px",
+                   fontWeight: 600,
+                   fontSize: "14px",
+                   textTransform: "capitalize",
+                   backgroundColor:
+                     appointmentStatus === "approved" || appointmentStatus === "completed"
+                       ? "#e9fbfb"
+                       : appointmentStatus === "cancelled" || appointmentStatus === "canceled" || appointmentStatus === "rejected"
+                       ? "#fff4f4"
+                       : "#eff6ff",
+                   color:
+                     appointmentStatus === "approved" || appointmentStatus === "completed"
+                       ? "#31b68f"
+                       : appointmentStatus === "cancelled" || appointmentStatus === "canceled" || appointmentStatus === "rejected"
+                       ? "#e63517"
+                       : "#2563eb",
+                   border: `1px solid ${
+                     appointmentStatus === "approved" || appointmentStatus === "completed"
+                       ? "#38b991"
+                       : appointmentStatus === "cancelled" || appointmentStatus === "canceled" || appointmentStatus === "rejected"
+                       ? "#e63517"
+                       : "#93c5fd"
+                   }`,
+                   display: "inline-flex",
+                   alignItems: "center",
+                 }}
+               >
+                 {getDisplayStatus()}
+               </div>
+             ) : showApproveReject ? (
+               <>
+                 <DashboardButtons 
+                    text={statusActionLoading === "approved" ? "Approving..." : "Approve"} 
+                    variant="DarkGreen" 
+                    textsize="sm" 
+                    icon={<CheckIcon size={18} />} 
+                    disabled={statusActionLoading !== null}
+                    onClick={() => handleUpdateStatus("approved")} 
+                  />
+                 <DashboardButtons 
+                    text={statusActionLoading === "rejected" ? "Rejecting..." : "Reject"} 
+                    variant="red" 
+                    textsize="sm" 
+                    icon={<XIcon size={18} />} 
+                    disabled={statusActionLoading !== null}
+                    onClick={() => handleUpdateStatus("rejected")} 
+                 />
+               </>
+             ) : isTeacherRole && isCancelledOrRescheduled ? null : (
+               <>
+                 <DashboardButtons 
+                    text="Reschedule" 
+                    variant="blueborder" 
+                    textsize="sm" 
+                    icon={<CalendarDaysIcon size={18} />} 
+                    onClick={() => { setActionError(null); 
+                    setActiveModal("reschedule"); }} 
+                  />
+                 {!isTeachersOrgOrGlobal && (
+                   <DashboardButtons 
+                      text="Cancel Appointment" 
+                      variant="redborder" 
+                      textsize="sm" 
+                      icon={<XIcon size={18} />} 
+                      onClick={() => { setActionError(null); 
+                      setActiveModal("cancel"); }} 
+                    />
+                 )}
+               </>
+             )}
              <DashboardButtons 
                 text="Back to Appointments" 
                 variant="blueborder" 
@@ -366,13 +569,29 @@ const InfoRow: React.FC<InfoRowProps> = ({ label, value }) =>
              />
           </div>
         </div>
+        {statusMessage && (
+          <div
+            style={{
+              padding: "10px 16px",
+              marginBottom: "16px",
+              borderRadius: "6px",
+              fontSize: "14px",
+              fontWeight: 600,
+              backgroundColor: statusMessage.type === "success" ? "#e9fbfb" : "#fff4f4",
+              color: statusMessage.type === "success" ? "#31b68f" : "#e63517",
+              border: `1px solid ${statusMessage.type === "success" ? "#38b991" : "#e63517"}`,
+            }}
+          >
+            {statusMessage.text}
+          </div>
+        )}
         <section className="details-card patient-card">
            <div className="card-title blue-title">
                <span className="title-icon">
                <UserIcon size={20} /></span>
                <Paragraph2 text="Patient/Appointment Taking Person Details" />
-           </div>
-           <div className="patient-content">
+            </div>
+            <div className="patient-content">
                <div className="patient-profile">
                   <div className="patient-avatar">
                     {imageUrl ? <img src={imageUrl} alt={patientName} />
@@ -413,6 +632,23 @@ const InfoRow: React.FC<InfoRowProps> = ({ label, value }) =>
                     label={item.label} 
                     value={item.value} 
                   />
+                )}
+                {isTeacherRole && isCancelledOrRescheduled && !isAdminDoneBy && (
+                  <div
+                    style={{
+                      color: "#e63517",
+                      fontWeight: 700,
+                      marginTop: "16px",
+                      fontSize: "14px",
+                      lineHeight: "1.5",
+                      padding: "10px 14px",
+                      backgroundColor: "#fff4f4",
+                      border: "1px solid #e63517",
+                      borderRadius: "6px"
+                    }}
+                  >
+                    Your request is waiting for approval from admin
+                  </div>
                 )}
             </div>
           </section>
@@ -472,7 +708,18 @@ const InfoRow: React.FC<InfoRowProps> = ({ label, value }) =>
               <span>Payment Date</span><strong>{valueOrFallback(paymentDate)}</strong>
             </div>
           </>}
-          {!paymentLoading && !paymentError && !paymentDetails && <div className="payment-row"><span>Payment</span><strong>No payment details available</strong></div>}
+          {!paymentLoading && !paymentError && !paymentDetails && (
+            <>
+              <div className="payment-row">
+                <span>Payment Status</span>
+                <span className="paid-badge">{valueOrFallback(appointment.paymentStatus)}</span>
+              </div>
+              <div className="payment-row">
+                <span>Done By</span>
+                <strong>{valueOrFallback(appointment.doneBy)}</strong>
+              </div>
+            </>
+          )}
         </div>
       </section>
 
@@ -495,7 +742,6 @@ const InfoRow: React.FC<InfoRowProps> = ({ label, value }) =>
                                 <option value="">{slotsLoading ? "Loading dates..." : "Select date"}</option>
                                 {availableDates.map((date) => <option key={date} value={date}>{date}</option>)}
                             </select>
-                            <ChevronDownIcon size={16} />
                          </div>
                       </div>
                       <div className="form-group">
@@ -505,7 +751,6 @@ const InfoRow: React.FC<InfoRowProps> = ({ label, value }) =>
                             <option value="">Select time</option>
                             {availableTimes.map((time) => <option key={time} value={time}>{time}</option>)}
                           </select>
-                          <ChevronDownIcon size={16} />
                         </div>
                       </div>
                     </div>
@@ -513,9 +758,17 @@ const InfoRow: React.FC<InfoRowProps> = ({ label, value }) =>
                       <label>Reason for Reschedule</label>
                       <textarea value={rescheduleReason} onChange={(event) => setRescheduleReason(event.target.value)} />
                     </div>
-                    <button className="action-button reschedule-button" type="button" onClick={handleRescheduleAppointment} disabled={actionLoading || slotsLoading}>
+                    {/* <button className="action-button reschedule-button" type="button" onClick={handleRescheduleAppointment} disabled={actionLoading || slotsLoading}>
                        <CalendarDaysIcon size={17} />{actionLoading ? "Rescheduling..." : "Reschedule Appointment"}
-                    </button>
+                    </button> */}
+                    <Button
+                      text={actionLoading ? "Rescheduling..." : "Reschedule Appointment"}
+                      icon={<CalendarDaysIcon size={22} />}
+                      width="full"
+                      textsize="md"
+                      onClick={handleRescheduleAppointment}
+                      disabled={actionLoading || slotsLoading}
+                    />
                   </> : <>
                     <div className="form-group">
                       <label>Cancellation Reason</label>
@@ -525,8 +778,17 @@ const InfoRow: React.FC<InfoRowProps> = ({ label, value }) =>
                       <label>Additional Comments (Optional)</label>
                         <textarea />
                     </div>
-                    <button className="action-button cancel-button" type="button" onClick={handleCancelAppointment} disabled={actionLoading}><XIcon size={18} />{actionLoading ? "Cancelling..." : "Cancel Appointment"}
-                    </button>
+                    {/* <button className="action-button cancel-button" type="button" onClick={handleCancelAppointment} disabled={actionLoading}><XIcon size={18} />{actionLoading ? "Cancelling..." : "Cancel Appointment"}
+                    </button> */}
+                    <Button
+                      text={actionLoading ? "Cancelling..." : "Cancel Appointment"}
+                      icon={<CalendarDaysIcon size={22} />}
+                      width="full"
+                      textsize="md"
+                      variant="red"
+                      onClick={handleCancelAppointment}
+                      disabled={actionLoading || slotsLoading}
+                    />
                   </>}
                 </div>
            </section>

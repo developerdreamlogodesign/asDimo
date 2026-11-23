@@ -19,7 +19,7 @@ import SupORGadminDetails from "./pages/superAdmin/organizationAdminDetails";
 import SupTherapist from "./pages/superAdmin/therapistAdmin";
 import SupParent from "./pages/superAdmin/parentAdmin";
 import SupAdmin from "./pages/superAdmin/Admin";
-import SupAppointment from "./pages/superAdmin/appoinmentList";
+import SupAppointment from "./pages/superAdmin/Appointments";
 import Report from "./pages/superAdmin/Report";
 import SupTherapistDetails from "./pages/superAdmin/TherapistDetails";
 import SupAppointmentDetails from "./pages/superAdmin/AppointmentDetails";
@@ -27,6 +27,7 @@ import SupUserDetails  from "./pages/superAdmin/UserDetails";
 import AddInformation from "./pages/superAdmin/AddInformation";
 import SuperAdminSettings from "./pages/superAdmin/Settings";
 import PaymentPage from "./pages/superAdmin/PaymentPage";
+import AddAppointment from "./pages/superAdmin/AddAppointment";
 
 
 
@@ -82,6 +83,7 @@ function App() {
           <Route path="add-information" element={<AddInformation />} />
           <Route path="report" element={<Report />} />
           <Route path="settings" element={<SuperAdminSettings />} />
+          <Route path="add-appointment" element={<AddAppointment/>} />
         </Route>
 
         {/* ================= ZONAL ADMIN ================= */} 
@@ -103,6 +105,7 @@ function App() {
           <Route path="therapist" element={<SupTherapist />} />
           <Route path="therapist-details" element={<SupTherapistDetails />} />
           <Route path="parent" element={<SupParent />} />
+          <Route path="user-details" element={<SupUserDetails />} />
           <Route path="report" element={<Report />} />
           <Route path="appointment" element={<SupAppointment />} />
           <Route path="appointment-details/:appointmentId" element={<SupAppointmentDetails />} />
@@ -125,6 +128,7 @@ function App() {
           <Route path="therapist" element={<SupTherapist />} />
           <Route path="therapist-details" element={<SupTherapistDetails />} />
           <Route path="parent" element={<SupParent />} />
+          <Route path="user-details" element={<SupUserDetails />} />
           <Route path="report" element={<Report />} />
           <Route path="appointment" element={<SupAppointment />} />
           <Route path="appointment-details/:appointmentId" element={<SupAppointmentDetails />} />
@@ -145,6 +149,7 @@ function App() {
           <Route path="therapist" element={<SupTherapist />} />
           <Route path="therapist-details" element={<SupTherapistDetails />} />
           <Route path="parent" element={<SupParent />} />
+          <Route path="user-details" element={<SupUserDetails />} />
           <Route path="report" element={<Report />} />
           <Route path="appointment" element={<SupAppointment />} />
           <Route path="appointment-details/:appointmentId" element={<SupAppointmentDetails />} />
@@ -164,6 +169,7 @@ function App() {
         >
           <Route index element={<TherapistIndex />} />
           <Route path="parent" element={<SupParent />} />
+          <Route path="user-details" element={<SupUserDetails />} />
           <Route path="report" element={<Report />} />
           <Route path="appointment" element={<SupAppointment />} />
           <Route path="appointment-details/:appointmentId" element={<SupAppointmentDetails />} />

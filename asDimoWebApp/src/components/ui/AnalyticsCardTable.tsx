@@ -28,15 +28,36 @@ interface ProfileTableProps {
   data: ProfileRow[];
 }
 
+const TableAvatar: React.FC<{ src?: string; name?: string }> = ({ src, name }) => {
+  const [imgError, setImgError] = React.useState(false);
+  const initial =
+    name && name !== "N/A" && name !== "-"
+      ? name.trim().charAt(0).toUpperCase()
+      : "U";
+
+  if (src && !imgError) {
+    return (
+      <img
+        src={src}
+        alt={name || ""}
+        className="doctor-image"
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+
+  return <div className="doctor-image-initial">{initial}</div>;
+};
+
 const ProfileTable: React.FC<ProfileTableProps> = ({
   headers,
   data,
 }) => {
     const navigate = useNavigate();
 
-  const handleViewDetails = (userId: string | number) => {
-    navigate("#");
-    console.log("View details for userId:", userId);
+  const handleViewDetails = (id?: string | number) => {
+    if (!id) return;
+    navigate(`appointment-details/${id}`);
   };
 
   const roleFlag = Number(tokenManager.getUser()?.flag);
@@ -67,7 +88,7 @@ const ProfileTable: React.FC<ProfileTableProps> = ({
               {permittedHeaders.map((header) => (
                 <td key={header.key}>
                   {header.key === "doctor" ? (
-                    <div className="doctor-info">
+                    <div className="doctor-info Doc">
                       {/* {row.profileImage && (
                         <img
                           src={row.profileImage}
@@ -83,13 +104,10 @@ const ProfileTable: React.FC<ProfileTableProps> = ({
                     </div>
                   ) : header.key === "user" ? (
                     <div className="doctor-info">
-                      {row.profileImageParent && (
-                        <img
-                          src={row.profileImageParent}
-                          alt={row.user || ""}
-                          className="doctor-image"
-                        />
-                      )}
+                      <TableAvatar
+                        src={row.profileImageParent}
+                        name={row.user}
+                      />
                       <h5>{row.user ?? "-"}</h5>
                     </div>
                     ) : header.key === "status" ? (
@@ -108,7 +126,7 @@ const ProfileTable: React.FC<ProfileTableProps> = ({
                             text="View Details"
                             icon={<img src={IButton} alt="view" className="btn-icon" />}
                             variant="trashparent"
-                            onClick={() => handleViewDetails(row.userId)}
+                            onClick={() => handleViewDetails(row.id || row._id || row.userId)}
                           />
                     ) : (
                       row[header.key] ?? "-"

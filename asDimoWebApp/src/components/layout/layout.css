@@ -60,20 +60,87 @@
 
 
 /* Desktop: always visible */
-@media (min-width: 768px) {
+@media (min-width: 1025px) {
 .sidebar { left: 0; }
 .menu-toggle {display: none;}
+}
+
+@media (min-width: 1025px) and (max-width: 1366px) {
+  .content{padding: 30px 20px;}
+  .boxShadow {padding: 30px 20px 35px;}
+
+  .analyticsZonalAdmin .Heading4 { width: 50% !important; align-content: center; }
+  .analyticsZonalAdmin .GlobalButton:not(.appointment_view) { width: 50% !important; }
 
 }
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .navbar {justify-content: space-between; padding: 0 20px;}
+  .content{width: 100vw; padding: 30px 20px;}
+  .sidebar {padding: 24px 7px;}
+
+  .analyticsZonalAdmin .Heading4 {width: 50% !important; align-content: center;}
+  .analyticsZonalAdmin .GlobalButton:not(.appointment_view) {width: 50% !important;}
+  .analyticsZonalAdmin .AnalyticsCardTable {overflow-x: scroll; margin-top: 2vw;}
+  .analyticsZonalAdmin .AnalyticsCardTable .profile-table {overflow-x: scroll; width: 1024px;}
+  .boxShadow {padding: 30px 20px 20px;}
+
+}
+
 /* Mobile */
 @media (max-width: 768px) {
 
     .content{padding: 30px 20px;}
     .navbar{height: 65px; padding: 0 20px;}
-    .navbar .menu-toggle{width: 30%;}
-    .navbar .ProfilePreview{width: 70%; justify-content: end;}
+    .navbar .menu-toggle{width: 20%;}
+    .navbar .ProfilePreview{width: 80%; justify-content: end;}
+    .navbar .ProfileName {font-size: 14px;}
+    .navbar .ProfileName p {font-size: 13px;}
 
     /* Notification start */
-    .NotificationDropdown{width: 280px; right: -130px;}
+    .NotificationDropdown{width: 280px; right: -155px;}
     /* Notification end */
+
+
+/* --------------- Dashboard ----------- */
+  .sidebar {padding: 24px 5px;}
+  .sidebar-menu-container {padding-right: 2px;}
+  .sidebar ul {padding: 0 10px;}
+  .sidebar li {padding: 0px;}
+
+  .main {width: 100%;}
+  .MainDashboard .AnalyticesCard {grid-template-columns: 1fr; gap: 17px;}
+  .mini-card {padding: 12px 12px;}
+  .mini-card h4.Heading4 {font-size: 16px; line-height: 25px; padding-bottom: 4px;}
+  .mini-card .mini-card-content a {font-size: 14px; line-height: 16px;}
+  .mini-card .mini-card-content a div {padding-top: 1px; padding-left: 5px;}
+  .mini-card .mini-card-content a div svg {width: 14px; height: 14px;}
+
+  /* .GlobalButton button.SolidBlue {} */
+  .GlobalButton button.md {font-size: 16px; line-height: 19px;}
+  .boxShadow {padding: 15px 17px 10px;}
+  .analyticsZonalAdmin .Heading4 {width: 50% !important; align-content: end;}
+  .analyticsZonalAdmin .GlobalButton:not(.appointment_view) {width: 50% !important;}
+  .analyticsZonalAdmin .AnalyticsCardTable {overflow-x: scroll; margin-top: 2vw;}
+  .analyticsZonalAdmin .AnalyticsCardTable .profile-table {overflow-x: scroll; width: 915px;}
+  /* .analyticsZonalAdmin .GlobalButton.appointment_view button {width: 122px;} */
+  .GlobalTable .custom-table {min-width: 100%;}
+
+  /* .custom-table tr td {border-bottom: 1px solid var(--GreyBorders);} */
+  .GlobalTable {border: none;}
+  .custom-table td {border-bottom: 1px solid var(--GreyBorders);}
+  .custom-table tbody tr td:last-child {border: none; padding-bottom: 3px;}
+  .GlobalButton button.greenBorder {padding: 8px 0px 6px 12px;}
+  .GlobalButton button .btn-icon svg {width: 17px; height: 17px;}
+  .GlobalTable .GlobalButton button {width: 111px; padding-right: 0;}
+  .AddInformation {padding: 15px 17px 25px;}
+
+  .TableSearchWrap {flex-direction: column-reverse; margin-bottom: 0px;}
+  .TableSearchWrap .AddUpdateButton {margin-top: 0 !important; width: 100% !important;}
+  .TableSearchWrap .search-sort-container {width: 100% !important;}
+  
+  .custom-table td:first-child {padding-left: 0px; padding-bottom: 21px;}
+  .custom-table td::before {margin-right: 10px;}
+
+
 }

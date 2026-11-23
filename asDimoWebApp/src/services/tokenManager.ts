@@ -157,7 +157,42 @@ export const tokenManager = {
     localStorage.removeItem(LEGACY_TOKEN_KEY);
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(USER_STORAGE_KEY);
     localStorage.removeItem(AUTH_SESSION_KEY);
   },
+};
+
+/**
+ * Resolves the role identifier for appointment operations based on the user's role flag.
+ * - 0 -> "superadmin"
+ * - 6 -> "zonaladmin"
+ * - 7 -> "admin"
+ * - 1, 5 -> "organizationadmin"
+ * - 3 -> "teacher"
+ * - 2, 4 -> "parent"
+ */
+export const getDoneBy = (flag?: number | string | null): string => {
+  let effectiveFlag = flag;
+  if (effectiveFlag === undefined || effectiveFlag === null) {
+    const user = tokenManager.getUser();
+    effectiveFlag = user?.flag;
+  }
+  const numFlag = effectiveFlag !== undefined && effectiveFlag !== null ? Number(effectiveFlag) : null;
+  switch (numFlag) {
+    case 0:
+      return "superadmin";
+    case 6:
+      return "zonaladmin";
+    case 7:
+      return "admin";
+    case 1:
+    case 5:
+      return "organizationadmin";
+    case 3:
+      return "teacher";
+    case 2:
+    case 4:
+      return "parent";
+    default:
+      return "admin";
+  }
 };

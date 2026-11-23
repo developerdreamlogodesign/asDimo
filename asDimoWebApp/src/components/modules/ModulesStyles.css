@@ -19,7 +19,7 @@
 .TableSearchWrap{align-items: center;}
 .TableSearchWrap .search-sort-container{width: 50%;}
 .TableSearchWrap .AddUpdateButton {width: 50%; display: flex; justify-content: end; margin-top: -125px; gap: 20px;}
-.DoctorsTabs{gap: 20px; }
+.DoctorsTabs{margin-top: 20px; gap: 20px;}
 /* Global Table List End */
 
 /* View Details Start */
@@ -107,4 +107,76 @@
 
 /* ---------------- ASSIGNED ADMIN ---------------- */
 
+@media (min-width: 1025px) and (max-width: 1366px) {
+    .ViewProfileDetails:not(.ORG) .ORGList .table-card .table-card-row { flex-direction: column; }
 
+    .UserDeatilswrap .profile-page {margin: 30px 0 0 0; border-radius: 15px;}
+    .UserDeatilswrap .dashboard-grid {display: flex; flex-wrap: wrap;}
+    .UserDeatilswrap .dashboard-grid .card {flex: 0 0 48%; width: 48%;}
+    .UserDeatilswrap .skills-content {display: flex; flex-wrap: wrap; width: 100%;}
+    .UserDeatilswrap .skills-list {width: 100%;}
+    .UserDeatilswrap .subscription-content {flex-direction: column; justify-content: flex-start; align-items: flex-start;}
+    .UserDeatilswrap .subscription-content .subscription-main {flex: 0 0 100%;}
+    .UserDeatilswrap .subscription-content .subscription-side {flex: 0 0 100%; text-align: left;}
+
+    
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+    .AnalyticesCard {grid-template-columns: 1fr 1fr; gap: 20px;}
+
+    .ViewProfileDetails:not(.ORG) .Profile_Editable {width: 55%;}
+    .ViewProfileDetails:not(.ORG) .ORGList {width: 45%;}
+    .ViewProfileDetails:not(.ORG) .Profile_Editable .boxShadow {padding: 30px 20px 20px;}
+    .ViewProfileDetails:not(.ORG) .ORGList .table-card .table-card-row {flex-direction: column;}
+    .ViewProfileDetails:not(.ORG) .ORGList .table-card .table-card-row .table-card-label {width: 100%;}
+    .ViewProfileDetails:not(.ORG) .ORGList .table-card .table-card-row .table-card-value {width: 100%;}
+
+    .UserDeatilswrap .dashboard-grid {display: flex; flex-wrap: wrap;}
+    .UserDeatilswrap .dashboard-grid .card {flex: 0 0 48%; width: 48%;}
+    .UserDeatilswrap .dashboard-grid .profile-card .profile-main {display: grid; gap: 10px;} 
+    .UserDeatilswrap .dashboard-grid .profile-card .profile-main .avatar {width: 68px; height: 68px;}
+    .UserDeatilswrap .profile-page {margin: 30px 0 0 0; border-radius: 15px;}
+    .UserDeatilswrap .subscription-content {flex-direction: column; justify-content: flex-start; align-items: flex-start;}
+    .UserDeatilswrap .subscription-content .subscription-main {flex: 0 0 100%;}
+    .UserDeatilswrap .subscription-content .subscription-side {flex: 0 0 100%; text-align: left;}
+    .UserDeatilswrap .skills-content {display: flex; flex-wrap: wrap; width: 100%;}
+    .UserDeatilswrap .skills-list {width: 100%;}
+
+    .OrganisationList {flex-direction: column; justify-content: flex-start; align-items: flex-start; row-gap: 10px;}
+    .ORGList .Heading2 {width: 100%;}
+    .ORGList .GlobalButton {width: 100%; justify-content: start;}
+
+}
+
+@media (max-width: 768px) {
+    .ViewProfileDetails {flex-direction: column;}
+    .ViewProfileDetails:not(.ORG) .Profile_Editable {width: 100%; margin-top: 20px;}
+    .ViewProfileDetails:not(.ORG) .ORGList {width: 100%; margin-top: 10px; margin-left: 0;}
+    .ViewProfileDetails:not(.ORG) .Profile_Editable .profile-image-container {margin-bottom: 10px;}
+
+    .dashboard .content > .d-flex {flex-wrap: wrap; row-gap: 20px;}
+    .AddInfoWordWrap {width: 100%;}
+    .BacktoListButton {justify-content: start; width: 100%;}
+
+    .AnalyticesCard {grid-template-columns: 1fr; gap: 20px;}
+
+    .UserDeatilswrap .UserDeatils {flex-direction: column; row-gap: 20px;}
+    .UserDeatilswrap .UserDeatils .User_Status {width: 100%;}
+    .UserDeatilswrap .UserDeatils .Actiom_btn {justify-content: start;}
+    .UserDeatilswrap .profile-page {margin: 30px 0 0 0; border-radius: 15px;}
+    .UserDeatilswrap .dashboard-grid {display: flex; flex-wrap: wrap;}
+    .UserDeatilswrap .dashboard-grid .card {width: 100%; padding: 16px;}
+    .UserDeatilswrap .dashboard-grid .profile-card .profile-main {display: grid; gap: 10px;}
+    .UserDeatilswrap .dashboard-grid .profile-card .profile-main .avatar {width: 70px; height: 70px;}
+    .UserDeatilswrap .dashboard-grid .profile-card .UnorderList {margin-top: 9px;}
+    .UserDeatilswrap .child-avatar {width: 40px; height: 40px; padding: 5px;}
+    .UserDeatilswrap .child-avatar img {width: 100%;}
+    .UserDeatilswrap .subscription-content {flex-direction: column; justify-content: flex-start; align-items: flex-start;}
+    .UserDeatilswrap .subscription-content .subscription-main {flex: 0 0 100%;}
+    .UserDeatilswrap .subscription-content .subscription-side {flex: 0 0 100%; text-align: left;}
+
+    .UserDeatilswrap .skills-section {width: 100%; overflow-x: scroll;}
+    .UserDeatilswrap .skills-content {display: flex; flex-wrap: wrap; width: 100%;}
+    
+}

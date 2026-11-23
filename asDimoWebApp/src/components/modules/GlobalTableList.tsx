@@ -11,6 +11,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import  { routes } from "../../routes/AppRoutes";
 // import PlusIcon from "../../assets/Images/PlusIcon.svg";
 import {XIcon} from 'lucide-animated';
+import { filebasename } from "../../api/config";
 
 
 interface ColumnConfig {
@@ -26,7 +27,51 @@ interface ZonalAdminListProps {
   filteredUserId?: string; // For filtering data by current user (teachersGlobal)
   filterByZonalAdminId?: boolean;
   showDoctorsTabs?: boolean; // For filtering admins by zonalAdminId (flag 7)
+  showSearch?: boolean;
+  showAddButton?: boolean;
+  showPagination?: boolean;
+  showChooseColumns?: boolean;
+  onViewAll?: () => void;
+  limit?: number;
+  selectable?: boolean;
+  showSort?: boolean;
 }
+
+const TableAvatar: React.FC<{ src?: string; name?: string }> = ({ src, name }) => {
+  const [imgError, setImgError] = React.useState(false);
+  const initial =
+    name && name !== "N/A" && name !== "-"
+      ? name.trim().charAt(0).toUpperCase()
+      : "U";
+
+  if (src && !imgError) {
+    return (
+      <img
+        src={src}
+        alt={name || ""}
+        className="doctor-image"
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+
+  return <div className="doctor-image-initial">{initial}</div>;
+};
+
+const getProfileImage = (user: any): string | undefined => {
+  if (!user) return undefined;
+  const image =
+    user.profileImg ||
+    user.googleProfile?.picture ||
+    user.facebookProfile?.picture ||
+    null;
+
+  if (!image) return undefined;
+  if (typeof image === "string" && (image.startsWith("http://") || image.startsWith("https://"))) {
+    return image;
+  }
+  return `${filebasename}${image.startsWith("/") ? "" : "/"}${image}`;
+};
 
 const getRelatedCount = (item: any, key: string) =>
   item.relatedData?.[key]?.count ??
@@ -39,6 +84,19 @@ const sortRows = (
   sortOrder: "asc" | "desc"
 ) => {
   return [...rows].sort((firstRow, secondRow) => {
+    if (sortBy === "created" || sortBy === "createdAt") {
+      const firstTime = new Date(
+        firstRow.originalData?.createdAt ?? firstRow.createdAt ?? 0
+      ).getTime();
+      const secondTime = new Date(
+        secondRow.originalData?.createdAt ?? secondRow.createdAt ?? 0
+      ).getTime();
+
+      return sortOrder === "desc"
+        ? secondTime - firstTime
+        : firstTime - secondTime;
+    }
+
     const firstValue = firstRow[sortBy] ?? "";
     const secondValue = secondRow[sortBy] ?? "";
 
@@ -71,6 +129,16 @@ const sortFieldMap: Record<string, string> = {
   pe: "relatedData.teachers.count",
   location: "roleData.city",
   subscription: "subscription",
+  zonal_admin_name: "relatedData.zonalAdmin.name",
+  admin_name: "relatedData.Admin.name",
+  organization_name: "relatedData.organizations.name",
+  parent_name: "name",
+  children_details: "relatedData.parents.count",
+  parent_count: "relatedData.parents.count",
+  therapists: "relatedData.teachers.count",
+  created: "createdAt",
+  createdAt: "createdAt",
+  email: "email",
 };
 
 const GlobalTableList: React.FC<ZonalAdminListProps> = ({
@@ -79,14 +147,22 @@ const GlobalTableList: React.FC<ZonalAdminListProps> = ({
   filteredUserId,
   filterByZonalAdminId,
   showDoctorsTabs = false,
+  showSearch = true,
+  showAddButton = true,
+  showPagination = true,
+  showChooseColumns = true,
+  onViewAll,
+  limit,
+  selectable = true,
+  showSort = true,
 }) => {
   const navigate = useNavigate();
   const flags = Array.isArray(flag) ? flag : [flag];
   const primaryFlag = flags[0];
   const flagDependency = flags.join(",");
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<"asc" | "desc">("asc");
-  const [sortBy, setSortBy] = useState("name");
+  const [sort, setSort] = useState<"asc" | "desc">("desc");
+  const [sortBy, setSortBy] = useState("createdAt");
   // null means no tab is selected, so both therapist types are shown.
   const [activeDoctorFlag, setActiveDoctorFlag] = useState<number | null>(null);
 
@@ -123,6 +199,7 @@ const GlobalTableList: React.FC<ZonalAdminListProps> = ({
       case 1: // Organization Admin
         return { field: "roleData.organizationAdminId", value: userIdValue };
       case 3: // Teacher
+      case 5: // Teacher (Global)
         return { field: "roleData.teacherId", value: userIdValue };
       default:
         return { field: null, value: null };
@@ -207,6 +284,10 @@ const GlobalTableList: React.FC<ZonalAdminListProps> = ({
         navigate(routes.ORGANIZATIONADMIN_USER_DETAILS, {
           state: { userId , flag },
         });
+      }else if(currentRole == "therapist"){
+        navigate(routes.THERAPIST_USER_DETAILS, {
+          state: { userId , flag },
+        });
       }else{
         navigate(routes.SUP_USER_DETAILS, {
           state: { userId , flag },
@@ -222,6 +303,15 @@ const GlobalTableList: React.FC<ZonalAdminListProps> = ({
       title: "Name",
       fixed: true,
       onFilterClick: handleSort,
+      render: (value: string, row: any) => (
+        <div className="doctor-info">
+          <TableAvatar
+            src={row.parentImage || undefined}
+            name={value || row.name}
+          />
+          <h5>{value || row.name || "-"}</h5>
+        </div>
+      ),
     },
     admin: {
       key: "admin",
@@ -241,6 +331,15 @@ const GlobalTableList: React.FC<ZonalAdminListProps> = ({
       key: "parent_name",
       title: "User",
       fixed: true,
+      render: (value: string, row: any) => (
+        <div className="doctor-info">
+          <TableAvatar
+            src={row.parentImage || undefined}
+            name={value || row.parent_name}
+          />
+          <h5>{value || row.parent_name || "-"}</h5>
+        </div>
+      ),
     },
     subscription: {
       key: "subscription",
@@ -288,30 +387,66 @@ const GlobalTableList: React.FC<ZonalAdminListProps> = ({
       const { field, value } = getFilterFieldByLoginFlag();
       if (field && value) {
         users = users.filter((item: any) => {
-          const fieldValue = field === "roleData.zonalAdminId"
-            ? item.roleData?.zonalAdminId
-            : field === "roleData.adminId"
-            ? item.roleData?.adminId
-            : field === "roleData.organizationAdminId"
-            ? item.roleData?.organizationAdminId
-            : field === "roleData.teacherId"
-            ? item.roleData?.teacherId
-            : null;
-
-          return String(fieldValue) === String(value);
+          if (field === "roleData.zonalAdminId") {
+            return String(item.roleData?.zonalAdminId) === String(value);
+          }
+          if (field === "roleData.adminId") {
+            return String(item.roleData?.adminId) === String(value);
+          }
+          if (field === "roleData.organizationAdminId") {
+            return String(item.roleData?.organizationAdminId) === String(value);
+          }
+          if (field === "roleData.teacherId") {
+            const itemTeacherId =
+              item.relatedData?.teacher?.teacherId ??
+              item.relatedData?.teacher?.userId ??
+              item.relatedData?.teacher?.userData?.userId ??
+              item.roleData?.teacherId ??
+              item.roleData?.therapistId;
+            return (
+              String(itemTeacherId) === String(value) ||
+              String(item.userId) === String(value)
+            );
+          }
+          return true;
         });
       }
 
       // Filter by filteredUserId if provided (for teachersGlobal users)
       if (filteredUserId) {
         users = users.filter((item: any) => {
-          // Show items where the parent/related user matches filteredUserId
+          // Check if item itself is the user (e.g. in therapist list)
+          if (
+            String(item.userId) === String(filteredUserId) ||
+            String(item._id) === String(filteredUserId)
+          ) {
+            return true;
+          }
+
+          // Check if relatedData teacher or roleData teacher/therapist matches filteredUserId
+          const relatedTeacher = item.relatedData?.teacher;
+          if (
+            String(relatedTeacher?.teacherId) === String(filteredUserId) ||
+            String(relatedTeacher?.userId) === String(filteredUserId) ||
+            String(relatedTeacher?.userData?.userId) === String(filteredUserId) ||
+            String(item.roleData?.teacherId) === String(filteredUserId) ||
+            String(item.roleData?.therapistId) === String(filteredUserId)
+          ) {
+            return true;
+          }
+
+          // Check if relatedData.teachers array contains the user
           const relatedTeachers = item.relatedData?.teachers?.data || [];
-          const isRelatedUser = relatedTeachers.some((teacher: any) => 
-            String(teacher.userId) === String(filteredUserId) || 
-            String(teacher._id) === String(filteredUserId)
-          );
-          return isRelatedUser || String(item.userId) === String(filteredUserId);
+          if (Array.isArray(relatedTeachers)) {
+            const isRelated = relatedTeachers.some((teacher: any) =>
+              String(teacher.userId) === String(filteredUserId) ||
+              String(teacher.teacherId) === String(filteredUserId) ||
+              String(teacher._id) === String(filteredUserId)
+            );
+            if (isRelated) return true;
+          }
+
+          return false;
         });
       }
 
@@ -322,15 +457,17 @@ const GlobalTableList: React.FC<ZonalAdminListProps> = ({
         );
       }
 
-    console.log("API Response:", users);
+    // console.log("API Response:", users);
 
     const formattedRows = users.map((item: any) => {
-      const parentId = Number(item.roleData?.parentId);
-      const teacherId = Number(item.relatedData?.teacher?.teacherId);
+      const parentId = Number(item.roleData?.parentId ?? item.userId);
+      const teacherId = Number(item.relatedData?.teacher?.teacherId ?? item.roleData?.teacherId);
 
       // Therapist name
       const therapistName =
-        item.relatedData?.teacher?.userData?.name ?? "-";
+        item.relatedData?.teacher?.userData?.name ??
+        item.relatedData?.teacher?.name ??
+        "-";
 
       // Find appointments belonging to this parent + therapist
       const matchedAppointments =
@@ -361,18 +498,24 @@ const GlobalTableList: React.FC<ZonalAdminListProps> = ({
       return {
         id: item._id,
         userId: item.userId,
+        parentImage: getProfileImage(item),
 
         name: item.name ?? "-",
         email: item.email,
 
         zonal_admin_name:
-          item.relatedData?.zonalAdmin?.userDataname ?? "Global",
+          item.relatedData?.zonalAdmin?.userData?.name ??
+          item.relatedData?.zonalAdmin?.userDataname ??
+          "Global",
 
         admin_name:
-          item.relatedData?.Admin?.userData?.name ?? "Global",
+          item.relatedData?.Admin?.userData?.name ??
+          item.relatedData?.admin?.userData?.name ??
+          "Global",
 
         organization_name:
           item.relatedData?.organizations?.userData?.name ??
+          item.relatedData?.organization?.userData?.name ??
           item.org_name ??
           "Global",
 
@@ -477,14 +620,20 @@ const GlobalTableList: React.FC<ZonalAdminListProps> = ({
     }
   };
 
-  const tableColumns = dynamicColumns.map((column) => ({
-    ...(columnRenderMap[column.key] || {
-      key: column.key,
+  const tableColumns = dynamicColumns.map((column) => {
+    const mapped = columnRenderMap[column.key];
+    return {
+      ...(mapped || {
+        key: column.key,
+        title: column.title,
+      }),
       title: column.title,
-    }),
-    title: column.title,
-    showFilter: column.sortable ?? false,
-  }));
+      fixed: column.fixed ?? mapped?.fixed,
+      showFilter: showSort ? (column.sortable ?? (mapped?.onFilterClick ? true : false)) : false,
+      onFilterClick: mapped?.onFilterClick ?? (column.sortable ? handleSort : undefined),
+      render: (column as any).render || mapped?.render,
+    };
+  });
 
   tableColumns.push({
     key: "actions",
@@ -561,34 +710,33 @@ const GlobalTableList: React.FC<ZonalAdminListProps> = ({
 
   return (
     <div>
-       <div className="d-flex TableSearchWrap">
-      <SearchWithSort
-        searchValue={search}
-        onSearchChange={setSearch}
-        sortValue={sort}
-        onSortChange={(value) => {
-          if (value === "asc" || value === "desc") {
-            setSort(value);
-          }
-        }}
-      />
-      {/* <DashboardButtons text="Add New Admin"/> */}
-      <div className="AddUpdateButton">
-      <DashboardButtons
-      variant="neon"
-      textsize="sm"
-      icon={<XIcon className="PlusIcon" size={20}/>}
-        text={getAddButtonText(primaryFlag)}
-        // onClick={() =>
-        //   navigate(routes.SUP_ADDINFORMATION, {
-        //     state: { flag: primaryFlag },
-        //   })
-        onClick={handleAddInformation}
-        // }
-      />
-      {/* <DashboardButtons text="Export" variant="blueborder" textsize="sm" icon={<img src={ExportIcon} alt="Add" className="btn-icon" onClick={() => exportSelectedRows(selectedUsers)}/>}/>  */}
-      </div>
-       </div>
+      {(showSearch || showAddButton) && (
+        <div className="d-flex TableSearchWrap">
+          {showSearch && (
+            <SearchWithSort
+              searchValue={search}
+              onSearchChange={setSearch}
+              sortValue={sort}
+              onSortChange={(value) => {
+                if (value === "asc" || value === "desc") {
+                  setSort(value);
+                }
+              }}
+            />
+          )}
+          {showAddButton && (
+            <div className="AddUpdateButton">
+              <DashboardButtons
+                variant="neon"
+                textsize="sm"
+                icon={<XIcon className="PlusIcon" size={20}/>}
+                text={getAddButtonText(primaryFlag)}
+                onClick={handleAddInformation}
+              />
+            </div>
+          )}
+        </div>
+      )}
              
         {showDoctorsTabs && (
           <div className="d-flex DoctorsTabs">
@@ -616,19 +764,20 @@ const GlobalTableList: React.FC<ZonalAdminListProps> = ({
 
       <Table
         columns={tableColumns}
-        rows={rows}
-        selectable={true}
-        onBulkDelete={true}
+        rows={limit ? rows.slice(0, limit) : rows}
+        selectable={selectable}
+        onBulkDelete={selectable}
         onDeleteSelected={handleDeleteSelected}
-        pagination={true}
+        pagination={showPagination}
         currentPage={currentPage}
-        totalPages={Math.ceil(rows.length / rowsPerPage) || 1}
+        totalPages={Math.ceil((limit ? rows.slice(0, limit) : rows).length / rowsPerPage) || 1}
         rowsPerPage={rowsPerPage}
         onPageChange={setCurrentPage}
         onRowsPerPageChange={setRowsPerPage}
         sortBy={sortBy}
         sortOrder={sort}
-        showChooseColumns={true}
+        showChooseColumns={showChooseColumns}
+        onViewAll={onViewAll}
       />
 
       {showModal && (

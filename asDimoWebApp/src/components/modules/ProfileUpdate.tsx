@@ -5,6 +5,7 @@ import ModalBox from "../ui/ModalBox";
 import "../ui/UIstyles.css";
 import { filebasename } from "../../api/config";
 import { authService } from "../../services/authService";
+import { tokenManager } from "../../services/tokenManager";
 
 interface ProfilePageProps {
   profileData: any;
@@ -17,6 +18,16 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     useState(false);
 
   // const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [isPublic, setIsPublic] = useState<boolean>(
+    Boolean(
+      profileData?.user?.globalStatus ??
+        tokenManager.getUser()?.globalStatus ??
+        false
+    )
+  );
+  const userFlag = Number(
+    profileData?.user?.flag ?? tokenManager.getUser()?.flag
+  );
 
   const [profile, setProfile] = useState({
     name: "",
@@ -28,6 +39,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
   useEffect(() => {
     if (profileData?.user) {
+      if (profileData.user.globalStatus !== undefined) {
+        setIsPublic(Boolean(profileData.user.globalStatus));
+      }
       setProfile({
         name: profileData.user.name || "",
         email: profileData.user.email || "",
@@ -41,6 +55,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
             ? "Zonal Admin"
             : profileData.user.flag === 1
             ? "Organization Admin"
+            : profileData.user.flag === 3
+            ? "Therapist"
+            : profileData.user.flag === 5
+            ? "Global Organization"
             : "User",
         profileImg: profileData.user.profileImg
           ? `${filebasename}${profileData.user.profileImg}`
@@ -113,6 +131,46 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     }
   };
 
+  const handleToggleGlobalStatus = async (nextStatus: boolean) => {
+    const previousStatus = isPublic;
+    setIsPublic(nextStatus);
+
+    try {
+      const token =
+        tokenManager.getAccessToken() || localStorage.getItem("token");
+      const userId =
+        profileData?.user?.userId ??
+        profileData?.user?._id ??
+        tokenManager.getUser()?.userId ??
+        tokenManager.getUser()?._id;
+
+      if (!token || userId === undefined || userId === null) {
+        setIsPublic(previousStatus);
+        return;
+      }
+
+      const response = await authService.updateGlobalStatus(token, {
+        userId,
+        globalStatus: nextStatus,
+      });
+
+      const updatedGlobalStatus =
+        response?.data?.user?.globalStatus ?? nextStatus;
+      setIsPublic(Boolean(updatedGlobalStatus));
+
+      const currentUser = tokenManager.getUser();
+      if (currentUser) {
+        tokenManager.setUser({
+          ...currentUser,
+          globalStatus: Boolean(updatedGlobalStatus),
+        });
+      }
+    } catch (error) {
+      console.error("Error updating global status:", error);
+      setIsPublic(previousStatus);
+    }
+  };
+
   return (
     <div className="profile-page">
       <div className="profile-card">
@@ -132,6 +190,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           profileImage={profile.profileImg}
           userName={profile.name}
           onImageChange={updateProfileImage}
+          showToggle={userFlag === 1}
+          isPublic={isPublic}
+          onToggle={handleToggleGlobalStatus}
         />
 
         <ProfileField

@@ -1,0 +1,405 @@
+/*........Appointment Details........*/
+.green-title {
+  background: #e9fbfb;
+  color: #31b68f;
+}
+
+.green-title .title-icon {
+  background: #38b991;
+  color: #fff;
+}
+
+.red-title {
+  background: #fff4f4;
+  color: #e63517;
+}
+
+.red-title .title-icon {
+  background: #e63517;
+  color: #fff;
+}
+
+/* =========================================================
+   PATIENT SECTION
+========================================================= */
+
+
+/* =========================================================
+   INFO
+========================================================= */
+
+.info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.info-row {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  align-items: center;
+  min-height: 16px;
+  column-gap: 15px;
+}
+
+.info-label {
+  font-size: 12px;
+  color: #666678;
+}
+
+.info-value {
+  font-size: 12px;
+  color: #4b4b5b;
+  font-weight: 700;
+}
+
+/* =========================================================
+   TWO COLUMN
+========================================================= */
+
+.two-column {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.two-column .details-card {
+  margin-bottom: 0;
+}
+
+.card-body {
+  min-height: 270px;
+  padding: 28px 45px 35px;
+  box-sizing: border-box;
+}
+
+.card-body .info-row {
+  grid-template-columns: 205px 1fr;
+  margin-bottom: 14px;
+}
+
+/* =========================================================
+   PAYMENT
+========================================================= */
+
+.payment-card {
+  margin-top: 26px;
+}
+
+.payment-body {
+  margin: 20px 40px 42px;
+  border: 1px solid #dedee2;
+}
+
+.payment-row {
+  min-height: 39px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  box-sizing: border-box;
+  border-bottom: 1px solid #e1e1e4;
+  font-size: 12px;
+  color: #626275;
+}
+
+.payment-row:last-child {
+  border-bottom: 0;
+}
+
+.payment-row strong {
+  color: #5b5b6c;
+  font-weight: 600;
+}
+
+.total-row {
+  background: #9ed98d;
+  color: #13820a;
+  font-weight: 800;
+}
+
+.total-row strong {
+  color: #13820a;
+  font-weight: 800;
+}
+
+.paid-badge {
+  background: #62a900;
+  color: #fff;
+  padding: 4px 16px;
+  border-radius: 2px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* =========================================================
+   ACTION CARDS
+========================================================= */
+
+.bottom-section {
+  margin-top: 26px;
+}
+
+.action-card {
+  overflow: hidden;
+}
+.appointment-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(26, 34, 48, 0.48);
+}
+
+.appointment-modal {
+  width: min(720px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  margin: 0;
+  background: #fff;
+}
+
+.modal-close {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  color: currentColor;
+  cursor: pointer;
+}
+
+.appointment-details-error {
+  margin: 24px;
+}
+
+.form-body {
+  padding: 20px 27px 18px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  font-size: 12px;
+  color: #48485a;
+  font-weight: 700;
+}
+
+ .form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  border: 1px solid #dcdce1;
+  border-radius: 2px;
+  background: #fff;
+  outline: none;
+  box-sizing: border-box;
+  color: #444;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.form-group input,
+.form-group select {
+  height: 36px;
+  padding: 0 10px;
+}
+
+.form-group textarea {
+  min-height: 68px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: #45a9e8;
+  box-shadow: 0 0 0 2px rgba(69, 169, 232, 0.1);
+} 
+
+/* =========================================================
+   SELECT
+========================================================= */
+
+.select-wrapper {
+  position: relative;
+}
+
+.select-wrapper select {
+  appearance: none;
+  padding-right: 35px;
+}
+
+.select-wrapper svg {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  pointer-events: none;
+  color: #777;
+}
+
+/* =========================================================
+   ACTION BUTTONS
+========================================================= */
+
+.action-button {
+  width: 100%;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 2px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.reschedule-button {
+  background: #38b991;
+}
+
+.cancel-button {
+  background: #ed2f0d;
+}
+
+.action-button:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (max-width: 1100px) {
+
+  .appointment-header {
+    flex-direction: column;
+    margin-bottom: 35px;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .patient-content {
+    grid-template-columns: 1fr;
+    gap: 25px;
+  }
+
+  .vertical-divider {
+    display: none;
+  }
+
+  .patient-profile {
+    justify-content: flex-start;
+  }
+
+  .parent-info {
+    padding-top: 5px;
+  }
+}
+
+@media (max-width: 800px) {
+
+  .appointment-page {
+    padding: 25px 18px 50px;
+  }
+
+  .two-column {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .two-column .details-card {
+    margin-bottom: 0;
+  }
+
+  .payment-body {
+    margin-left: 18px;
+    margin-right: 18px;
+  }
+
+  .card-body {
+    padding-left: 25px;
+    padding-right: 25px;
+  }
+}
+
+@media (max-width: 600px) {
+
+  .appointment-header h1 {
+    font-size: 21px;
+  }
+
+  .appointment-header p {
+    font-size: 14px;
+  }
+
+  .header-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn {
+    width: 100%;
+  }
+
+  .patient-content {
+    padding: 25px 20px;
+  }
+
+  .patient-profile {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+  }
+
+  .info-row,
+  .card-body .info-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    margin-bottom: 15px;
+  }
+
+  .payment-row {
+    min-height: 48px;
+    gap: 10px;
+  }
+
+  .payment-row span:first-child {
+    max-width: 50%;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .form-body {
+    padding: 18px;
+  }
+}

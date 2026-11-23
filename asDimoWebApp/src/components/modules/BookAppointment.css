@@ -1,0 +1,522 @@
+/* ProfileForm */
+
+.appointment-profile-form {
+  width: 100%;
+}
+
+.appointment-profile-form .add_information {
+  width: 100%;
+  display: block;
+}
+
+.appointment-profile-form .bottom-fields {
+  display: grid;
+  grid-template-columns: 1.2fr 1.1fr;
+  gap: 0 28px;
+  width: 100%;
+}
+
+.appointment-profile-form .form-group {
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 27px;
+}
+
+.appointment-profile-form .form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.appointment-profile-form .form-group.half-width {
+  grid-column: auto;
+}
+
+.appointment-profile-form .profile-field-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 26px;
+  color: #3893ff;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.appointment-profile-form .profile-field-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #3893ff;
+  color: #fff;
+}
+
+.appointment-profile-form .profile-field-icon svg {
+  width: 23px;
+  height: 23px;
+  stroke-width: 1.8;
+}
+
+.appointment-profile-form .required-star {
+  color: #e53935;
+  margin-left: 3px;
+}
+
+.appointment-profile-form .form-group select,
+.appointment-profile-form .form-group input {
+  width: 100%;
+  height: 62px;
+  padding: 0 24px;
+  border: 1px solid #ceced2;
+  border-radius: 10px;
+  outline: none;
+  background: transparent;
+  color: #49485a;
+  font-size: 18px;
+}
+
+.appointment-profile-form .form-group select {
+  cursor: pointer;
+}
+
+.appointment-profile-form .form-group select:disabled,
+.appointment-profile-form .form-group input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  background-color: #f5f6f8;
+}
+
+.disabled-section {
+  pointer-events: none;
+  opacity: 0.55;
+  user-select: none;
+}
+
+.not-available-time {
+  margin: 4px 0 0;
+  color: #6b7280;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.appointment-profile-form .form-group select:focus {
+  border-color: #3893ff;
+}
+
+.appointment-profile-form .submit-section {
+  display: none;
+}
+
+/* General labels */
+
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 26px;
+  color: #3893ff;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.section-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #3893ff;
+  color: white;
+}
+
+.section-icon svg {
+  width: 23px;
+  height: 23px;
+}
+
+/* Date and time */
+
+.date-section {
+  margin-top: 5px;
+  width: 100%;
+}
+
+.date-time-container {
+  display: grid;
+  grid-template-columns: minmax(380px, 0.88fr) minmax(0, 1.12fr);
+  gap: 14px;
+  align-items: start;
+  padding: 0 5px;
+}
+
+/* Calendar */
+
+
+/* Session time slots */
+
+.time-slots-container {
+  width: 100%;
+  padding-top: 4px;
+}
+
+.time-slots-container > h3 {
+  margin: 0 0 23px;
+  color: #262635;
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.session-group {
+  margin-bottom: 25px;
+}
+
+.session-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.session-heading span {
+  display: flex;
+  align-items: center;
+  color: #0089ed;
+}
+
+.session-heading svg {
+  width: 27px;
+  height: 27px;
+  stroke: #0788e7;
+}
+
+.session-heading p {
+  margin: 0;
+  color: #171717;
+  font-size: 18px;
+}
+
+.time-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.time-buttons button {
+  height: 51px;
+  border: 1.5px solid #008cf0;
+  border-radius: 11px;
+  background: #fff;
+  color: #0085e9;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.time-buttons button:hover {
+  background: #eaf5ff;
+}
+
+.time-buttons button.selected-time {
+  background: #0788df;
+  color: #fff;
+  border-color: #0788df;
+}
+
+/* Horizontal time slots carousel */
+.time-slots-carousel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 8px 2px 12px;
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.time-slots-carousel button {
+  flex: 0 0 auto;
+  min-width: 100px;
+  padding: 10px 16px;
+  border: 1px solid #d9dce3;
+  border-radius: 8px;
+  background: #fff;
+  color: #333;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  scroll-snap-align: start;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.time-slots-carousel button:hover {
+  border-color: #2563eb;
+}
+
+.time-slots-carousel button.selected-time {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+/* Payment */
+
+.payment-options {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin: 25px 0 50px 3px;
+}
+
+.payment-options label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #49485a;
+  font-size: 19px;
+  cursor: pointer;
+}
+
+.payment-options input {
+  position: absolute;
+  opacity: 0;
+}
+
+.custom-radio {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1.5px solid #008cf0;
+  border-radius: 50%;
+}
+
+.payment-options input:checked + .custom-radio::after {
+  content: "";
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #1597f5;
+}
+
+/* Footer */
+
+.appointment-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding-bottom: 45px;
+}
+
+.payable-amount {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.payable-amount label {
+  color: #1597f5;
+  font-size: 18px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.payable-amount span {
+  color: #49485a;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.payable-amount input {
+  width: 100px;
+  padding: 5px 0;
+  border: none;
+  border-bottom: 1px solid #aaa;
+  outline: none;
+  background: transparent;
+  color: #49485a;
+  font-size: 19px;
+  font-weight: 600;
+}
+
+
+
+.appointment-actions button {
+  min-width: 143px;
+  height: 51px;
+  border: none;
+  border-radius: 5px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.cancel-btn {
+  background: #92909c;
+}
+
+.cancel-btn:hover {
+  background: #777582;
+}
+
+.book-btn {
+  padding: 0 20px;
+  background: #8bc91e;
+}
+
+.book-btn:hover {
+  background: #78b213;
+}
+
+/* Tablet */
+
+@media (max-width: 1024px) {
+  .date-time-container {
+    grid-template-columns: 1fr;
+    gap: 25px;
+  }
+
+  .time-slots-container {
+    padding-top: 0;
+  }
+
+  .time-buttons {
+    max-width: 650px;
+  }
+}
+
+/* Mobile */
+
+@media (max-width: 600px) {
+  .appointment-profile-form .bottom-fields {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .appointment-profile-form .form-group {
+    grid-column: 1 / -1;
+    margin-bottom: 22px;
+  }
+
+  .appointment-profile-form .profile-field-label {
+    font-size: 18px;
+    margin-bottom: 15px;
+  }
+
+  .appointment-profile-form .profile-field-icon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .appointment-profile-form .form-group select,
+  .appointment-profile-form .form-group input {
+    height: 53px;
+    font-size: 15px;
+  }
+
+  .section-label {
+    font-size: 18px;
+    margin-bottom: 15px;
+  }
+
+  .section-icon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .date-time-container {
+    padding: 0;
+    grid-template-columns: 1fr;
+    gap: 25px;
+  }
+
+
+  .time-slots-container > h3 {
+    font-size: 19px;
+  }
+
+  .session-heading {
+    margin-bottom: 13px;
+  }
+
+  .session-heading p {
+    font-size: 16px;
+  }
+
+  .time-buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .time-buttons button {
+    height: 45px;
+    font-size: 14px;
+  }
+
+  .session-group {
+    margin-bottom: 23px;
+  }
+
+  .payment-options {
+    margin: 20px 0 30px;
+    gap: 15px;
+  }
+
+  .payment-options label {
+    font-size: 16px;
+  }
+
+  .custom-radio {
+    width: 27px;
+    height: 27px;
+  }
+
+  .payment-options input:checked + .custom-radio::after {
+    width: 15px;
+    height: 15px;
+  }
+
+  .appointment-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 25px;
+  }
+
+  .payable-amount {
+    flex-wrap: wrap;
+  }
+
+  .payable-amount label {
+    font-size: 16px;
+  }
+
+  .payable-amount input {
+    width: 90px;
+    font-size: 17px;
+  }
+
+  .appointment-actions {
+    width: 100%;
+  }
+
+  .appointment-actions button {
+    flex: 1;
+    min-width: 0;
+    height: 47px;
+    padding: 0 8px;
+    font-size: 13px;
+  }
+}

@@ -24,13 +24,24 @@ interface ProfileFieldProps {
   onClick?: () => void;
   isDropdown?: boolean;
   options?: DropdownOption[];
+  multiple?: boolean;
 }
 
 export const ProfileImageField: React.FC<{
   profileImage?: string;
   userName?: string;
   onImageChange?: (file: File) => void;
-}> = ({ profileImage, userName, onImageChange }) => {
+  showToggle?: boolean;
+  isPublic?: boolean;
+  onToggle?: (isPublic: boolean) => void;
+}> = ({
+  profileImage,
+  userName,
+  onImageChange,
+  showToggle = false,
+  isPublic = true,
+  onToggle,
+}) => {
   const [uploadedImage, setUploadedImage] = useState("");
 
   const handleImageUpload = (
@@ -50,6 +61,7 @@ export const ProfileImageField: React.FC<{
 
   return (
     <div className="profile-image-container">
+      <div className="profile-avatar-row">
       {imageSrc ? (
         <img
           src={imageSrc}
@@ -61,6 +73,22 @@ export const ProfileImageField: React.FC<{
           {userName?.charAt(0)?.toUpperCase() || "U"}
         </div>
       )}
+
+        {showToggle && (
+          <div className="toggleProfileWrap">
+            <button
+              type="button"
+              className={`toggle-btn ${isPublic ? "active" : ""}`}
+              onClick={() => onToggle?.(!isPublic)}
+            >
+              <span className="toggle-text">
+                {isPublic ? "Public" : "Private"}
+              </span>
+              <span className="toggle-circle"></span>
+            </button>
+          </div>
+        )}
+      </div>
 
       <label className="upload-image-btn">
         <img src={UploadCameraIcon} alt="Upload" />
@@ -87,6 +115,7 @@ const ProfileField: React.FC<ProfileFieldProps> = ({
   onResetPassword,
   onClick,
   isDropdown = false,
+  multiple = false,
   options = [],
 }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -113,11 +142,50 @@ const ProfileField: React.FC<ProfileFieldProps> = ({
 
         {isEditing && !isPassword ? (
           isDropdown ? (
+            // <select
+            //   value={fieldValue}
+            //   onChange={(e) => setFieldValue(e.target.value)}
+            // >
+            //   <option value="">Select {label}</option>
+
+            //   {options.map((option) => (
+            //     <option
+            //       key={option.value}
+            //       value={option.value}
+            //       disabled={option.disabled}
+            //       className={option.disabled ? "disabled-option" : ""}
+            //     >
+            //       {option.label}
+            //     </option>
+            //   ))}
+            // </select>
+
             <select
-              value={fieldValue}
-              onChange={(e) => setFieldValue(e.target.value)}
+              multiple={multiple}
+              value={
+                multiple
+                  ? fieldValue
+                      .split(",")
+                      .map((item) => item.trim())
+                      .filter(Boolean)
+                  : fieldValue
+              }
+              onChange={(e) => {
+                if (multiple) {
+                  const selectedValues = Array.from(
+                    e.target.selectedOptions,
+                    (option) => option.value
+                  );
+
+                  setFieldValue(selectedValues.join(", "));
+                } else {
+                  setFieldValue(e.target.value);
+                }
+              }}
             >
-              <option value="">Select {label}</option>
+              {!multiple && (
+                <option value="">Select {label}</option>
+              )}
 
               {options.map((option) => (
                 <option

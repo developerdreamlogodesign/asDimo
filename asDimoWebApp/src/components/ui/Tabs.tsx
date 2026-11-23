@@ -38,7 +38,7 @@ const Tabs: React.FC<TabsProps> = ({
         ))}
       </div>
 
-      <div className="tabs-content">
+      <div className="tabs-content" style={{ position: "relative" }}>
         {tabs[activeTab]?.content}
       </div>
     </div>

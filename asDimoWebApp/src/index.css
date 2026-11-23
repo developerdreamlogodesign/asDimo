@@ -50,4 +50,118 @@ body{ font-family: "SourceSans", sans-serif; }
 button:focus-visible{outline: solid 0px;}
 .PlusIcon{rotate: 45deg; padding-right: 6px; margin-left: -15px; margin-bottom: -10px;}
 .card {background: #ffffff; border-radius: 16px; padding: 20px; box-shadow: 0 4px 12px rgba(30, 45, 65, 0.10); }
+/* /////////////// blabla  */
 /* Global CSS End */
+
+
+/* Responsive Start from here */
+@media (max-width: 768px) {
+
+/* HeadingPara Start */
+h1.PageTitle{font-size: 30px; line-height: 40px;}
+/* HeadingPara End */
+
+/* Start Modal Box */
+.modalBox { max-width: 100%; }
+.modalHeader { padding: 16px 20px; font-size: 18px; }
+.modalBody { padding: 20px;}
+/* Start Modal Box */
+
+/* Login form Satrt */
+.FormContainer .login-box{padding: 35px;}
+.FormContainer .login-box .form-group label{font-size: 14px;}
+/* Login form End */
+
+/* Form Add Start */
+  .add_information .top-section { flex-direction: column; } 
+  .add_information .profile-preview { width: 140px; height: 140px; }
+  .half-width, .quarter-width { flex: 0 0 100%; } 
+  .add_information .submit-section{justify-content: flex-end;}
+  .add_information .form-group input, .add_information .form-group select{height: 38px;}
+  .add_information .bottom-fields{gap: 0px; margin-top: 0px;}
+  .add_information .top-section{gap: 0px; margin-bottom: 0px;}
+  .add_information .profile-upload{flex: 1;}
+  .add_information .right-fields{width: 100%;}
+/* Form Add End */
+
+/* Appointment Calender Start */
+.appointment-calendar{ padding:18px; }
+.calendar-days{ grid-template-columns:repeat(4,1fr); gap:10px; }
+.day-card{ padding:10px; }
+.day-number{ font-size:20px; }
+.slot{ flex:1; justify-content:center; text-align:center; }
+/* Appointment Calender End */
+
+ .mobile-select-all { display: flex; align-items: center; justify-content: flex-start; padding: 12px; margin-bottom: 12px; border-radius: 12px; background: var(--TextcolorLight); border: 1px solid #e5e7eb; }
+  .mobile-select-all label { display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; }
+  .mobile-select-all input[type="checkbox"] { width: 18px; height: 18px; }
+  .custom-table { min-width: 100%; }
+  .custom-table thead { display: none; } 
+  .custom-table, .custom-table tbody, .custom-table tr, .custom-table td { display: block; width: 100%; } 
+  .custom-table td:not(:last-child){border: none;}
+  .custom-table td:not(:first-child){padding: 10px 10px;}
+  .custom-table .GlobalButton{justify-content: right;}
+  .custom-table tr {
+    background: var(--GreenButtonHover);
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    margin-bottom: 15px;
+    padding: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+
+  .custom-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-align: right;
+    border: none;
+    padding: 10px 0;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .custom-table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #374151;
+    text-align: left;
+    margin-right: 15px;
+  }
+
+  /* Checkbox column */
+  .custom-table td:first-child {
+    justify-content: flex-start;
+  }
+
+  .custom-table td:first-child::before {
+    content: "";
+  }
+
+  .check-button {
+    justify-content: flex-start;
+  }
+
+  /* No data */
+  .custom-table td[colspan] {
+    text-align: center;
+    display: block;
+  }
+
+  .custom-table td[colspan]::before {
+    display: none;
+  }
+
+  /* Pagination */
+  .TablepaginationWrap {
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .rows-per-page {
+    width: 100%;
+    justify-content: center;
+  }
+  
+}

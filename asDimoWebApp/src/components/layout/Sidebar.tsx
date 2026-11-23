@@ -17,7 +17,7 @@ import SettingsIcon from "../../assets/Images/SettingsIcon.svg";
 import LogOutIcon from "../../assets/Images/LogOutIcon.svg";
 import ReportIcon from "../../assets/Images/ReportIcon.svg";
 import DashboardButtons from "../ui/Buttons";
-import ModalBox from "../ui/ModalBox";
+import ModalBox from "../ui/ModalBox"; 
 import { getCurrentUserRole } from "../../middleware/AuthMiddleware";
 
 
@@ -99,6 +99,7 @@ const menuConfig = {
     { name: "Dashboard", path: routes.THERAPIST, icon: DashBoardIcon, },
     { name: "Users/Parents", path: routes.THERAPIST_PARENT, icon: UserIcon, },
     { name: "Report", path: routes.THERAPIST_REPORT, icon: ReportIcon, },
+    // { name: "Appointments", path: routes.THERAPIST_APPOINTMENT, icon: AppointmentIcon, },
     { name: "Appointments", path: routes.THERAPIST_APPOINTMENT, icon: AppointmentIcon, },
     { name: "Settings", path: routes.THERAPIST_SETTINGS, icon: SettingsIcon, }
   ],

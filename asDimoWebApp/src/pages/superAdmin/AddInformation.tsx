@@ -9,11 +9,29 @@ import { countries } from "../../components/ui/countries";
 import DashboardButtons from "../../components/ui/Buttons";
 import { routes } from "../../routes/AppRoutes";
 import { ArrowLeftIcon } from "lucide-animated";
+import { tokenManager } from "../../services/tokenManager";
 
 
 const AddInformation: React.FC = () => {
-const location = useLocation();
+  const location = useLocation();
   const navigate = useNavigate();
+
+  const currentUser = tokenManager.getUser();
+  const currentLoginFlag =
+    currentUser?.flag !== undefined && currentUser?.flag !== null
+      ? Number(currentUser.flag)
+      : null;
+  const currentUserName =
+    currentUser?.name ||
+    currentUser?.fullName ||
+    currentUser?.username ||
+    "";
+  const currentUserId = currentUser?.userId ? String(currentUser.userId) : "";
+  const currentUserOrgName =
+    currentUser?.org_name ||
+    currentUser?.organization?.name ||
+    currentUser?.organizationName ||
+    currentUserName;
 
   const flag = Number(location.state?.flag);
   const [adminOptions, setAdminOptions] = useState<Field["options"]>([]);
@@ -57,7 +75,7 @@ const location = useLocation();
           }
         }
 
-        if (flag === 3) {
+        if (flag === 3 || flag === 5) {
           const [organizationResponse, adminResponse] = await Promise.all([
             authService.getUsersByFlag(token, 1),
             authService.getUsersByFlag(token, 7),
@@ -104,6 +122,7 @@ const location = useLocation();
       case 1:
         return "Organization Admin Information";
       case 3:
+      case 5:
         return "Therapist Information";
       case 2:
         return "Parent Information";
@@ -134,6 +153,7 @@ const getPageConfig = (flag: number) => {
     };  
 
      case 3:
+     case 5:
       return {
         route: routes.SUP_THERAPIST,
         text: "Back To Therapist",
@@ -163,6 +183,7 @@ const pageConfig = getPageConfig(flag);
       case 1:
         return "Organization Admin";
       case 3:
+      case 5:
         return "Therapist";
       case 2:
         return "Parent";
@@ -223,14 +244,19 @@ const pageConfig = getPageConfig(flag);
       //   payload
       // );
 
-      const formData = new FormData();
+      const userScope =
+        currentLoginFlag === 1 || currentLoginFlag === 5 || currentLoginFlag === 3
+          ? "non_global"
+          : data.user_scope;
+
       const submitFlag =
-        data.user_scope === "global" && flag === 3
+        userScope === "global" && (flag === 3 || flag === 5)
           ? 5
-          : data.user_scope === "global" && flag === 2
+          : userScope === "global" && flag === 2
           ? 4
           : flag;
 
+      const formData = new FormData();
       formData.append("name", data.name);
       formData.append("email", data.email);
       formData.append("phone", data.phone);
@@ -241,8 +267,43 @@ const pageConfig = getPageConfig(flag);
       formData.append("country", data.country);
       formData.append("flag", String(submitFlag));
 
-      if (flag === 3) {
+      if (flag === 3 || flag === 5 || submitFlag === 3 || submitFlag === 5) {
         formData.append("therapist_category", data.therapist_category);
+        formData.append("specialization", data.therapist_category);
+        formData.append("gender", data.gender ?? "");
+        formData.append(
+          "fees",
+          data.fees !== undefined && data.fees !== null ? String(data.fees) : ""
+        );
+        formData.append(
+          "about_doctor",
+          data.about_doctor ?? data.about ?? ""
+        );
+        formData.append(
+          "qualifications",
+          data.qualifications ?? data.qualification ?? ""
+        );
+
+        const selectedLanguages = Array.isArray(data.languages)
+          ? data.languages
+          : typeof data.languages === "string"
+            ? data.languages
+                .split(",")
+                .map((language: string) => language.trim())
+                .filter(Boolean)
+            : [];
+
+        selectedLanguages.forEach((language: string) => {
+          formData.append("languages", language);
+        });
+
+        if (data.yearsOfExperience !== undefined && data.yearsOfExperience !== null && data.yearsOfExperience !== "") {
+          formData.append("yearsOfExperience", String(data.yearsOfExperience));
+        }
+
+        if (userScope === "global" && data.cliniqueName) {
+          formData.append("cliniqueName", data.cliniqueName);
+        }
       }
 
       if (data.profileImage) {
@@ -254,11 +315,17 @@ const pageConfig = getPageConfig(flag);
       }
 
       if (flag === 7) {
-        formData.append("zonalAdminId", data.zonalAdminId);
+        const zonalId = currentLoginFlag === 6 ? currentUserId : data.zonalAdminId;
+        if (zonalId) {
+          formData.append("zonalAdminId", String(zonalId));
+        }
       }
 
       if (flag === 1) {
-        formData.append("adminId", data.adminId);
+        const admId = currentLoginFlag === 7 ? currentUserId : data.adminId;
+        if (admId) {
+          formData.append("adminId", String(admId));
+        }
         formData.append(
           "organization_type",
           String(data.organization_type)
@@ -266,25 +333,33 @@ const pageConfig = getPageConfig(flag);
       }
 
       if (submitFlag === 5) {
-        formData.append("adminId", data.adminId);
+        const admId = currentLoginFlag === 7 ? currentUserId : data.adminId;
+        if (admId) {
+          formData.append("adminId", String(admId));
+        }
       }
       if (flag === 4) {
         formData.append("teacherId", "null");
       }
-      if (flag === 3) {
-        if (data.organizationAdminId) {
+      if (flag === 3 || flag === 5 || submitFlag === 3 || submitFlag === 5) {
+        const orgAdminId =
+          currentLoginFlag === 1 || currentLoginFlag === 5
+            ? currentUserId
+            : data.organizationAdminId;
+        if (orgAdminId) {
           formData.append(
             "organizationAdminId",
-            data.organizationAdminId
+            String(orgAdminId)
           );
         }
       }
 
       if (flag === 2) {
-        if (data.teacherId) {
+        const tId = currentLoginFlag === 3 ? currentUserId : data.teacherId;
+        if (tId) {
           formData.append(
             "teacherId",
-            data.teacherId
+            String(tId)
           );
         }
       }
@@ -334,123 +409,292 @@ const pageConfig = getPageConfig(flag);
             ],
             required: true,
           },
-          {
-            name: "adminId",
-            label: "Under Admin",
-            fieldType: "select" as const,
-            width: "half" as const,
-            options: adminOptions,
-            required: true,
-          },
+          currentLoginFlag === 7
+            ? {
+                name: "adminId",
+                label: "Under Admin",
+                type: "text",
+                width: "half" as const,
+                value: currentUserName,
+                readOnly: true,
+                required: true,
+              }
+            : {
+                name: "adminId",
+                label: "Under Admin",
+                fieldType: "select" as const,
+                width: "half" as const,
+                options: adminOptions,
+                required: true,
+              },
             ]
           : []),
 
 
 ...(flag === 7
   ? [
-    {
-      name: "zonalAdminId",
-      label: "Under Zonal Admin",
-      fieldType: "select" as const,
-      width: "full" as const,
-      options: zonalAdminOptions,
-      required: true,
-    },
+    currentLoginFlag === 6
+      ? {
+          name: "zonalAdminId",
+          label: "Under Zonal Admin",
+          type: "text",
+          width: "full" as const,
+          value: currentUserName,
+          readOnly: true,
+          required: true,
+        }
+      : {
+          name: "zonalAdminId",
+          label: "Under Zonal Admin",
+          fieldType: "select" as const,
+          width: "full" as const,
+          options: zonalAdminOptions,
+          required: true,
+        },
     ]
-: [3].includes(flag)
+: [3, 5].includes(flag)
   ? [
       {
         name: "therapist_category",
-        label: "Therapist Category",
+        label: "Specialization",
         fieldType: "select" as const,
         width: "full" as const,
         placeholder: "Select Therapist Category",
         options: [
           { label: "Psychologist", value: "Psychologist" },
-          { label: "Speech Therapist", value: "Speech Therapist" },
-          { label: "Special Educator", value: "Special Educator" },
-          { label: "Operational Therapist", value: "Operational Therapist" },
+          { label: "Speech Therapist", value: "speech therapist" },
+          { label: "Special Educator", value: "special educator" },
+
+          { label: "Operational Therapist", value: "operational therapist" },
+          { label: "Special Package", value: "special package" },
         ],
         required: true,
       },
       {
-        name: "user_scope",
-        label: "User Type",
-        fieldType: "select" as const,
-        width: "full" as const,
-        placeholder: "",
+        name: "languages",
+        label: "Languages",
+        fieldType: "checkbox" as const,
+        width: "half" as const,
+        placeholder: "Select Languages",
         options: [
-          {
-            label: "Global",
-            value: "global",
-          },
-          {
-            label: "Non-Global",
-            value: "non_global",
-          },
+          { label: "English", value: "English" },
+          { label: "Hindi", value: "Hindi" },
+          { label: "Marathi", value: "Marathi" },
+          { label: "Gujarati", value: "Gujarati" },
+          { label: "Tamil", value: "Tamil" },
+          { label: "Telugu", value: "Telugu" },
+          { label: "Bengali", value: "Bengali" },
+          { label: "Kannada", value: "Kannada" },
+          { label: "Malayalam", value: "Malayalam" },
         ],
         required: true,
       },
       {
-        name: "organizationAdminId",
-        label: "Organization Name",
-        fieldType: "select" as const,
-        width: "full" as const,
-        placeholder: "Select Organization",
-        options: organizationOptions,
-        showWhen: {
-          field: "user_scope",
-          value: "non_global",
-        },
+        name: "yearsOfExperience",
+        label: "Experience (Years)",
+        type: "number",
+        placeholder: "Enter Years of Experience",
+        width: "half" as const,
         required: true,
       },
       {
-        name: "adminId",
-        label: "Admin Name",
+        name: "qualifications",
+        label: "Qualification",
+        type: "input",
+        placeholder: "Enter Years of Experience",
+        width: "half" as const,
+        required: true,
+      },
+      {
+        name: "gender",
+        label: "Gender",
+        width: "half" as const,
         fieldType: "select" as const,
-        width: "full" as const,
-        placeholder: "Select Admin",
-        options: adminOptions,
+        options: [
+          { label: "Male", value: "Male" },
+          { label: "Female", value: "Female" },
+          { label: "Others", value: "Other" },
+
+        ],
+        required: true,
+      },
+      {
+        name: "fees",
+        label: "Fees",
+        type: "number",
+        placeholder: "Enter fees",
+        required: true,
+      },
+      {
+        name: "about_doctor",
+        label: "About Doctor",
+        type: "text",
+        placeholder: "Enter About Doctor",
+        required: false,
+      },
+      currentLoginFlag === 1 || currentLoginFlag === 5 || currentLoginFlag === 3
+        ? {
+            name: "user_scope",
+            label: "User Type",
+            fieldType: "select" as const,
+            width: "full" as const,
+            options: [
+              {
+                label: "Non-Global",
+                value: "non_global",
+              },
+            ],
+            value: "non_global",
+            readOnly: true,
+            required: true,
+          }
+        : {
+            name: "user_scope",
+            label: "User Type",
+            fieldType: "select" as const,
+            width: "full" as const,
+            placeholder: "",
+            options: [
+              {
+                label: "Global",
+                value: "global",
+              },
+              {
+                label: "Non-Global",
+                value: "non_global",
+              },
+            ],
+            required: true,
+          },
+      {
+        name: "cliniqueName",
+        label: "Clinic Name",
+        placeholder: "Enter Clinic Name",
         showWhen: {
           field: "user_scope",
           value: "global",
         },
         required: true,
       },
+      currentLoginFlag === 1 || currentLoginFlag === 5
+        ? {
+            name: "organizationAdminId",
+            label: "Organization Name",
+            type: "text",
+            width: "full" as const,
+            value: currentUserOrgName,
+            readOnly: true,
+            showWhen: {
+              field: "user_scope",
+              value: "non_global",
+            },
+            required: true,
+          }
+        : {
+            name: "organizationAdminId",
+            label: "Organization Name",
+            fieldType: "select" as const,
+            width: "full" as const,
+            placeholder: "Select Organization",
+            options: organizationOptions,
+            showWhen: {
+              field: "user_scope",
+              value: "non_global",
+            },
+            required: true,
+          },
+      currentLoginFlag === 7
+        ? {
+            name: "adminId",
+            label: "Admin Name",
+            type: "text",
+            width: "full" as const,
+            value: currentUserName,
+            readOnly: true,
+            showWhen: {
+              field: "user_scope",
+              value: "global",
+            },
+            required: true,
+          }
+        : {
+            name: "adminId",
+            label: "Admin Name",
+            fieldType: "select" as const,
+            width: "full" as const,
+            placeholder: "Select Admin",
+            options: adminOptions,
+            showWhen: {
+              field: "user_scope",
+              value: "global",
+            },
+            required: true,
+          },
     ]
 : [2].includes(flag)
   ? [
-      {
-        name: "user_scope",
-        label: "User Type",
-        fieldType: "select" as const,
-        width: "full" as const,
-        placeholder: "",
-        options: [
-          {
-            label: "Global",
-            value: "global",
-          },
-          {
-            label: "Non-Global",
+      currentLoginFlag === 1 || currentLoginFlag === 5 || currentLoginFlag === 3
+        ? {
+            name: "user_scope",
+            label: "User Type",
+            fieldType: "select" as const,
+            width: "full" as const,
+            options: [
+              {
+                label: "Non-Global",
+                value: "non_global",
+              },
+            ],
             value: "non_global",
+            readOnly: true,
+            required: true,
+          }
+        : {
+            name: "user_scope",
+            label: "User Type",
+            fieldType: "select" as const,
+            width: "full" as const,
+            placeholder: "",
+            options: [
+              {
+                label: "Global",
+                value: "global",
+              },
+              {
+                label: "Non-Global",
+                value: "non_global",
+              },
+            ],
+            required: true,
           },
-        ],
-        required: true,
-      },
-      {
-        name: "teacherId",
-        label: "Therapist Name",
-        fieldType: "select" as const,
-        width: "full" as const,
-        placeholder: "Select Therapist",
-        options: therapistOptions,
-        showWhen: {
-          field: "user_scope",
-          value: "non_global",
-        },
-        required: true,
-      },
+      currentLoginFlag === 3
+        ? {
+            name: "teacherId",
+            label: "Therapist Name",
+            type: "text",
+            width: "full" as const,
+            value: currentUserName,
+            readOnly: true,
+            showWhen: {
+              field: "user_scope",
+              value: "non_global",
+            },
+            required: true,
+          } 
+          
+        : {
+            name: "teacherId",
+            label: "Therapist Name",
+            fieldType: "select" as const,
+            width: "full" as const,
+            placeholder: "Select Therapist",
+            options: therapistOptions,
+            showWhen: {
+              field: "user_scope",
+              value: "non_global",
+            },
+            required: true,
+          },
     ]
   :  []),
 

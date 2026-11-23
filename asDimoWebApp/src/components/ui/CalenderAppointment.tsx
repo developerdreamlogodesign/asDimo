@@ -1,13 +1,21 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, CalendarDays, } from "lucide-react"; 
 import "./Calendar.css";
 
-interface CalendarProps { value?: Date; onChange?: (date: Date) => void; minDate?: Date; maxDate?: Date; availableDates?: string[]; }
+interface CalendarProps { value?: Date; onChange?: (date: Date) => void; minDate?: Date; maxDate?: Date; availableDates?: string[]; disabled?: boolean; }
 
-const Calendar: React.FC<CalendarProps> = ({ value, onChange, minDate, maxDate, availableDates = [], }) => {
+const Calendar: React.FC<CalendarProps> = ({ value, onChange, minDate, maxDate, availableDates = [], disabled: calendarDisabled = false, }) => {
   const [selectedDate, setSelectedDate] = useState<Date | null>( value || null );
 
-  const [currentMonth, setCurrentMonth] = useState( value || new Date() ); 
+  const [currentMonth, setCurrentMonth] = useState( value || new Date() );
+
+  useEffect(() => {
+    setSelectedDate(value || null);
+    setCurrentMonth(value || new Date());
+    if (value) {
+      setCurrentMonth(value);
+    }
+  }, [value]);
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
 
@@ -82,6 +90,7 @@ const Calendar: React.FC<CalendarProps> = ({ value, onChange, minDate, maxDate, 
   };
 
   const isDisabled = (date: Date) => {
+    if (calendarDisabled) return true;
     const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
     const minimumDate = minDate ? new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate()).getTime() : undefined;
     const maximumDate = maxDate ? new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate()).getTime() : undefined;
@@ -146,7 +155,7 @@ const Calendar: React.FC<CalendarProps> = ({ value, onChange, minDate, maxDate, 
             const selected = isSameDay(selectedDate, date);
             const today = isToday(date);
             const disabled = isDisabled(date);
-            const hasAvailability = availableDates.includes(dateKey(date));
+            const hasAvailability = !disabled && availableDates.includes(dateKey(date));
 
             return (
               <button

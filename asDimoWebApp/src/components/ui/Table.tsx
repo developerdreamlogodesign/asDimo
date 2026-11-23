@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect, } from "react";
 import {DeleteIcon, ChevronLeftIcon, ChevronRightIcon, ArrowDownIcon, DownloadIcon, ChartColumnDecreasingIcon} from 'lucide-animated';
 import DashboardButtons from "./Buttons";
 import { tokenManager } from "../../services/tokenManager";
+import ModalBox from "./ModalBox";
 
 interface TableColumn {
   key: string;
@@ -33,6 +34,7 @@ interface TableProps {
   sortOrder?: "asc" | "desc";
   displayLimit?: number;
   showChooseColumns?: boolean;
+  onViewAll?: () => void;
 }
 
 const Table: React.FC<TableProps> = ({
@@ -54,6 +56,7 @@ const Table: React.FC<TableProps> = ({
   sortOrder = "asc",
   displayLimit,
   showChooseColumns = false,
+  onViewAll,
 }) => {
   const roleFlag = Number(tokenManager.getUser()?.flag);
   const hiddenColumnKeysByRole: Record<number, string[]> = {
@@ -247,10 +250,10 @@ const toggleColumn = (key: string) => {
       return col && !col.fixed;
     }).length;
 
-  if (optionalSelected >= 5) {
-    alert("Maximum 5 optional columns allowed.");
-    return;
-  }
+    if (optionalSelected >= 5) {
+      setShowLimitModal(true);
+      return;
+    }
 
   setVisibleColumns(prev => [...prev, key]);
 };
@@ -259,6 +262,7 @@ const displayedColumns = permittedColumns.filter(
   c => c.fixed || visibleColumns.includes(c.key)
 );
 
+const [showLimitModal, setShowLimitModal] = useState(false);
 
   return (
     <div className={`custom-table-wrapper ${className}`}>
@@ -305,6 +309,11 @@ const displayedColumns = permittedColumns.filter(
                       ))}
                   </div>
               )}
+          </div>
+        )}
+        {onViewAll && (
+          <div className="table-toolbar">
+            <DashboardButtons text="View All" variant="SolidNeon" textsize="sm" onClick={onViewAll} />
           </div>
         )}
     </div>
@@ -553,6 +562,27 @@ const displayedColumns = permittedColumns.filter(
               </div>
           </div>
         </div>
+      )}
+      {showLimitModal && (
+        <ModalBox
+          header="Limit Reached"
+          body={
+            <>
+              <p>Maximum 5 optional columns allowed.</p>
+              <div className="logout-popup-actions d-flex">
+              <DashboardButtons
+                text="OK"
+                textsize="sm"
+                type="button"
+                variant="DarkGreen"
+                onClick={() => setShowLimitModal(false)}
+              /> 
+            </div>       
+            </>
+          }
+          onCancel={() => setShowLimitModal(false)}
+          showCloseButton={true}
+        />
       )}
     </div>
   );

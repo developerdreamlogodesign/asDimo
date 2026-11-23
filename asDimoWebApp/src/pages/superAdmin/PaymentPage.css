@@ -1,21 +1,9 @@
-.payment-page {
-  min-height: calc(100vh - 145px);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 460px);
-  align-items: center;
-  gap: 72px;
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 42px 0;
-  color: var(--TextcolorDark);
-}
-
+.payment-page { min-height: calc(100vh - 145px); display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 460px); align-items: center; gap: 72px; max-width: 1120px; margin: 0 auto; padding: 42px 0; color: var(--TextcolorDark); } 
 .payment-intro { max-width: 560px; }
 .payment-kicker { color: var(--SecondayColor); font-size: 12px; font-weight: 600; letter-spacing: 1.6px; }
 .payment-intro h1 { margin: 14px 0 16px; font-size: clamp(32px, 5vw, 54px); line-height: 1.02; font-weight: 500; }
 .payment-intro > p { max-width: 480px; color: var(--TextcolorGrey); font-size: 18px; line-height: 1.55; }
 .payment-trust { display: flex; align-items: center; gap: 8px; margin-top: 28px; color: var(--DarkGreen); font-size: 14px; }
-
 .payment-panel { background: #fff; border: 1px solid var(--GreyBorders); border-radius: 16px; padding: 30px; box-shadow: 0 18px 48px rgba(54, 145, 131, 0.12); }
 .payment-panel-header { display: flex; align-items: center; gap: 12px; padding-bottom: 24px; margin-bottom: 22px; border-bottom: 1px solid var(--GreyBorders); }
 .payment-panel-header h2, .payment-success h2 { margin: 0; font-size: 22px; font-weight: 500; }
@@ -39,6 +27,10 @@
 .payment-success p { max-width: 260px; }
 .payment-success small { margin-top: 18px; color: var(--TextcolorGrey); }
 .payment-spinner { animation: payment-spin 0.9s linear infinite; }
+
+/*  */
+.AddAppointment{justify-content: right; display: flex; width: 100%;}
+/*  */
 
 @keyframes payment-spin { to { transform: rotate(360deg); } }
 

@@ -1,0 +1,163 @@
+.calenderBody{background: var(--lightBackground); padding: 30px 10px 5px; border-radius: 5px;}
+.TimeSlotsActions{margin-top: 30px; gap: 20px; justify-self: end;}
+.calendar {
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-sizing: border-box;
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.calendar-month {
+  display: flex;
+  align-items: center; 
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.calendar-nav-button {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.calendar-nav-button:hover {
+  background: #f3f4f6;
+}
+
+.calendar-weekdays,
+.calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.calendar-weekday {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: #9ca3af;
+  padding-bottom: 8px;
+}
+
+.calendar-day {
+  width: 36px;
+  height: 36px;
+  margin: 2px auto;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: #374151;
+}
+
+.calendar-day:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.calendar-day.other-month {
+  color: #d1d5db;
+}
+
+.calendar-day.today {
+  font-weight: 700;
+  border: 1px solid #d1d5db;
+}
+
+.calendar-day.has-availability {
+  background: #e9fbf2;
+  color: #16845a;
+  font-weight: 700;
+}
+
+.calendar-day.selected {
+  background: #111827;
+  color: #ffffff;
+  border: none;
+}
+
+.calendar-day.disabled {
+  color: #d1d5db;
+  cursor: not-allowed;
+}
+
+
+/* ......................... */
+
+.TimeSlotsWrapper {
+  margin-top: 24px;
+}
+
+.TimeSlotsTitle {
+  margin: 0 0 16px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.TimeSlots {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.TimeSlotButton {
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid #e2e2e2;
+  border-radius: 8px;
+  background: #fff;
+  color: #333;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.TimeSlotButton:hover {
+  border-color: #222;
+}
+
+.TimeSlotButton:focus,
+.TimeSlotButton.active {
+  background: #222;
+  border-color: #222;
+  color: #fff;
+}
+
+.TimeSlotButton.selected {
+  background: #222;
+  border-color: #222;
+  color: #fff;
+}
+
+.TimeSlotButton.api-available,
+.TimeSlotButton.api-available:disabled,
+.TimeSlotButton.api-available:hover {
+  background: #B28CFF;
+  border-color: #B28CFF;
+  color: #F8F8F8;
+  cursor: not-allowed;
+}
+
+.TimeSlotButton.booked,
+.TimeSlotButton.booked:disabled {
+  background: #f8e5e5;
+  border-color: #e4aaaa;
+  color: #a33b3b;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}

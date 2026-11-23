@@ -322,6 +322,16 @@ export const authService = {
       return response.data;
     },
 
+  getUsersByForParent: async (token: string) => {
+    const response = await axios.get(`${BASE_URL}/auth/getUsersByForParent`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return response.data;
+  },
+
   getAppoinments: async (token: string) => {
     const response = await axios.get(`${BASE_URL}/appointments`, {
       headers: {
@@ -380,6 +390,27 @@ export const authService = {
       {
         headers: {
           Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    return response.data;
+  },
+
+  updateGlobalStatus: async (
+    token: string,
+    payload: {
+      userId: number | string;
+      globalStatus: boolean;
+    }
+  ) => {
+    const response = await axios.post(
+      `${BASE_URL}/auth/updateGlobalStatus`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
       }
     );

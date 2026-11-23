@@ -21,6 +21,7 @@ SUP_USER_DETAILS: "/superadmin/user-details",
 SUP_APPOINTMENT_DETAILS: "/superadmin/appointment-details",
 SUP_REPORT: "/superadmin/report",
 SUP_ADDINFORMATION: "/superadmin/add-information",
+SUP_ADDAPPOINTMENT: "/superadmin/add-appointment",
 // Super Admin Routes End.............
 
 

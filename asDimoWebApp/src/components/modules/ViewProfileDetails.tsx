@@ -36,6 +36,10 @@ const ViewProfileDetails: React.FC<Props> = ({ userId }) => {
   const [pincode, setPincode] = useState("");
   const [address, setAddress] = useState("");
   const [country, setCountry] = useState("");
+  const [therapistCategory, setTherapistCategory] = useState("");
+  const [yearsOfExperience, setYearsOfExperience] = useState("");
+  const [languages, setLanguages] = useState("");
+  const [clinicName, setClinicName] = useState("");
   const [id, setId] = useState("");
   const [assignmemberList, setASMemberList] = useState<any[]>([]);
   const [aslistTitle, setASListTitle] = useState("Assigned to Zonal Admin");
@@ -123,10 +127,10 @@ const handleAssignedUserSave = async (
     if (userFlag !== 7 && userFlag !== 1) {
       return;
     }
-
+    // console.log("........id",userId);
     const payload = {
       flag: userFlag,
-      userId: Number(id),
+      userId: Number(userId),
       updatedUserId: Number(selectedUserId),
     };
 
@@ -277,18 +281,50 @@ const [showResetModal, setShowResetModal] = useState(false);
         // console.log("Fetched user data:", user);
 
 
-        if(user.flag == 7){
-          // console.log("Fetched user data:", user.relatedData?.zonalAdmin?.name);
-          setSelectedAdminName(user.relatedData?.zonalAdmin?.name || "");
-          setSelectedAdminId(user.relatedData?.zonalAdmin?.userId || "");
-        }else if(user.flag == 3){
-          setSelectedAdminName(user.relatedData?.organizations?.name || "");
-          setSelectedAdminId(user.relatedData?.organizations?.userId || "");
-        }else{
-          // console.log("Fetched user data:", user.relatedData?.Admin?.name);
-          setSelectedAdminName(user.relatedData?.Admin?.name || "");
-          setSelectedAdminId(user.relatedData?.Admin?.userId || "");
-
+        if (user.flag == 7) {
+          // Admin -> Assigned to Zonal Admin
+          setSelectedAdminName(
+            user.relatedData?.zonalAdmin?.userData?.name ||
+            user.relatedData?.zonalAdmin?.userDataname ||
+            user.relatedData?.zonalAdmin?.name ||
+            ""
+          );
+          setSelectedAdminId(
+            user.relatedData?.zonalAdmin?.userData?.userId ||
+            user.relatedData?.zonalAdmin?.userId ||
+            user.roleData?.zonalAdminId ||
+            ""
+          );
+        } else if (user.flag == 3) {
+          setSelectedAdminName(
+            user.relatedData?.organizations?.userData?.name ||
+            user.relatedData?.organization?.userData?.name ||
+            user.relatedData?.organizations?.name ||
+            user.relatedData?.organization?.name ||
+            ""
+          );
+          setSelectedAdminId(
+            user.relatedData?.organizations?.userData?.userId ||
+            user.relatedData?.organization?.userData?.userId ||
+            user.relatedData?.organizations?.userId ||
+            user.relatedData?.organization?.userId ||
+            ""
+          );
+        } else {
+          setSelectedAdminName(
+            user.relatedData?.Admin?.userData?.name ||
+            user.relatedData?.admin?.userData?.name ||
+            user.relatedData?.Admin?.name ||
+            user.relatedData?.admin?.name ||
+            ""
+          );
+          setSelectedAdminId(
+            user.relatedData?.Admin?.userData?.userId ||
+            user.relatedData?.admin?.userData?.userId ||
+            user.relatedData?.Admin?.userId ||
+            user.relatedData?.admin?.userId ||
+            ""
+          );
         }
 
         if (!user) return;
@@ -313,13 +349,34 @@ const [showResetModal, setShowResetModal] = useState(false);
         setPincode(user.pincode || "");
         setAddress(user.address || "");
         setCountry(user.country || "");
-        // setId(user.id || user._id || "");
-        setId(user.userId || user.id || user._id || "");
-        // setLastLogin(user.lastLogin || "");
+
+        const teacherDetails = user.roleData || {};
+
+        setTherapistCategory(teacherDetails.therapist_category || "");
+
+        setYearsOfExperience(
+          teacherDetails.yearsOfExperience !== undefined &&
+          teacherDetails.yearsOfExperience !== null
+            ? String(teacherDetails.yearsOfExperience)
+            : ""
+        );
+
+        setLanguages(
+          Array.isArray(teacherDetails.languages)
+            ? teacherDetails.languages.join(", ")
+            : teacherDetails.languages || ""
+        );
+
+        setClinicName(teacherDetails.cliniqueName || "");
+
+        // setId(user.userId || user.id || user._id || "");
+        setId(user._id || "");
 
         await fetchAssignedMembers(
           user.flag,
-          user.roleData?.zonalAdminId
+          user.roleData?.zonalAdminId ||
+          user.relatedData?.zonalAdmin?.userData?.userId ||
+          user.relatedData?.zonalAdmin?.userId
         );
 
         // console.log(user);
@@ -401,7 +458,7 @@ const [showResetModal, setShowResetModal] = useState(false);
 
     const updateField = async (
       field: string,
-      value: string
+      value: string | string[]
     ) => {
       try {
         const token = tokenManager.getAccessToken();
@@ -409,7 +466,19 @@ const [showResetModal, setShowResetModal] = useState(false);
         if (!token || !userId) return;
 
         const formData = new FormData();
-        formData.append(field, value);
+
+        if (field === "languages") {
+          const languageList = Array.isArray(value)
+            ? value
+            : String(value)
+                .split(",")
+                .map((item) => item.trim())
+                .filter(Boolean);
+
+          languageList.forEach((language) => formData.append(field, language));
+        } else {
+          formData.append(field, String(value));
+        }
 
         await authService.updateProfile(
           token,
@@ -419,25 +488,37 @@ const [showResetModal, setShowResetModal] = useState(false);
 
         switch (field) {
           case "name":
-            setName(value);
+            setName(String(value));
             break;
           case "phone":
-            setPhone(value);
+            setPhone(String(value));
             break;
           case "city":
-            setCity(value);
+            setCity(String(value));
             break;
           case "state":
-            setState(value);
+            setState(String(value));
             break;
           case "address":
-            setAddress(value);
+            setAddress(String(value));
             break;
           case "country":
-            setCountry(value);
+            setCountry(String(value));
             break;
           case "pincode":
-            setPincode(value);
+            setPincode(String(value));
+            break;
+          case "yearsOfExperience":
+            setYearsOfExperience(String(value));
+            break;
+          case "languages":
+            setLanguages(Array.isArray(value) ? value.join(", ") : String(value));
+            break;
+          case "cliniqueName":
+            setClinicName(String(value));
+            break;
+          case "therapist_category":
+            setTherapistCategory(String(value));
             break;
         }
 
@@ -452,6 +533,25 @@ const [showResetModal, setShowResetModal] = useState(false);
       return <Loader fullScreen />;
     }
 
+    const therapistCategoryOptions = [
+      { label: "Psychologist", value: "Psychologist" },
+      { label: "Speech Therapist", value: "speech therapist" },
+      { label: "Special Educator", value: "special educator" },
+      { label: "Operational Therapist", value: "operational therapist" },
+    ];
+
+    const languageOptions = [
+      { label: "English", value: "English" },
+      { label: "Hindi", value: "Hindi" },
+      { label: "Marathi", value: "Marathi" },
+      { label: "Gujarati", value: "Gujarati" },
+      { label: "Tamil", value: "Tamil" },
+      { label: "Telugu", value: "Telugu" },
+      { label: "Bengali", value: "Bengali" },
+      { label: "Kannada", value: "Kannada" },
+      { label: "Malayalam", value: "Malayalam" },
+    ];
+
 
   return (
     <div className="d-flex ViewProfileDetails">
@@ -461,6 +561,55 @@ const [showResetModal, setShowResetModal] = useState(false);
           <ProfileField label="Profile" value={name} onSave={(value) => updateField("name", value) } />
           <ProfileField label="Email" value={email} editable={false} /> 
           <ProfileField label="Phone" value={phone} onSave={(value) => updateField("phone", value) } />
+
+          {(userFlag === 3 || userFlag === 5) && (
+            <>
+              <ProfileField
+                label="Therapist Category"
+                value={therapistCategory}
+                isDropdown
+                options={therapistCategoryOptions}
+                onSave={(value) =>
+                  updateField("therapist_category", value)
+                }
+                // editable={false}
+              />
+
+              <ProfileField
+                label="Years of Experience"
+                value={yearsOfExperience}
+                onSave={(value) =>
+                  updateField("yearsOfExperience", value)
+                }
+                // editable={false}
+              />
+
+              <ProfileField
+                label="Languages"
+                value={languages}
+                isDropdown
+                multiple
+                options={languageOptions}
+                onSave={(value) =>
+                  updateField("languages", value)
+                }
+                // editable={false}
+              />
+
+              {/* Clinic Name should ONLY show for Flag 5 */}
+              {userFlag === 5 && (
+                <ProfileField
+                  label="Clinic Name"
+                  value={clinicName}
+                  onSave={(value) =>
+                    updateField("cliniqueName", value)
+                  }
+                  // editable={false}
+                />
+              )}
+            </>
+          )}
+
           <ProfileField label="Zone" value={zone} editable={true} onClick={() => setShowResetModal(true)} />
           {/* {userFlag !== 6 && (
             <ProfileField
