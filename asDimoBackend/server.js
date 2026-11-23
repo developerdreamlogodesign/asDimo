@@ -4,7 +4,7 @@ import { env } from "./src/config/env.js";
 
 connectDB();
 
-const PORT = 6002;
+const PORT = 6003;
 const HOST = "127.0.0.1";
 
 app.listen(PORT, HOST, () => {
